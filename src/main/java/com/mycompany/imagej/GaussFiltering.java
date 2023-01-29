@@ -24,7 +24,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Random;
 import java.util.Arrays;
 
 import ij.IJ;
@@ -109,7 +109,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
      * @param args whatever, it's ignored
      * @throws Exception
      */
-    private static double tau = 230;
+    private static double tau = 7;
     private static int k = 2;
     private static int rank = 3;
     private static double tol = 0.001;
@@ -126,7 +126,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         ij.ui().showUI();
         
         // ask the user for a file to open
-        final File file = ij.ui().chooseFile(null, "open");
+//        final File file = ij.ui().chooseFile(null, "open");
+        final File file = new File("/home/s-daniiel/Desktop/1-Original.tif");
         
         // si le fichier choisi est bon
         if (file != null) {
@@ -135,6 +136,9 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         	
         	// recuperation des donnees
         	ImagePlus imp = IJ.openImage(file.getPath());  // image
+        	ImageProcessor ip = imp.getProcessor();
+        	int autotr = ip.getAutoThreshold();
+        	System.out.println("++++++++++++++++++++> ip: "+autotr);
         	int stackSize = imp.getStackSize();	// nombre de frames
             int ImgHeight = imp.getHeight();	// hauteur
             int ImgWidth = imp.getWidth();	// largeur
@@ -191,12 +195,24 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             /*
              * SVD 
              */
+//            int nb = 0; // 12h30
+//            SimpleMatrix ok = new SimpleMatrix(nbSlices, height*width);
+//            for (int i=0; i<nbSlices; i++) {
+//            	for (int j=0; j<width; j++) {
+//            		for (int e=0; e<height; e++) {
+//            			ok.set(i, nb, matrix[i][j][e]);
+//            			nb++;
+//            		}
+//            	}
+//            	nb = 0;
+//            }
+            
             int nb = 0; // 12h30
             SimpleMatrix ok = new SimpleMatrix(nbSlices, height*width);
             for (int i=0; i<nbSlices; i++) {
-            	for (int j=0; j<width; j++) {
-            		for (int e=0; e<height; e++) {
-            			ok.set(i, nb, matrix[i][j][e]);
+            	for (int j=0; j<height; j++) {
+            		for (int e=0; e<width; e++) {
+            			ok.set(i, nb, matrix[i][e][j]);
             			nb++;
             		}
             	}
@@ -207,6 +223,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             ok = ok.transpose();
             ok.printDimensions();
             ok.saveToFileCSV("OK.csv"); 
+            System.out.println("=======ICI");
             
             for (int i=0; i<ok.numCols(); i++) {
             	if (i%25==0) {
@@ -362,7 +379,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X.numRows(), X.numCols());
                     qr.decompose(X2);
                     DenseMatrix64F qm = qr.getQ(null, true);
-                    DenseMatrix64F rm = qr.getR(null, true);
+//                    DenseMatrix64F rm = qr.getR(null, true);
                     
                     X = SimpleMatrix.wrap(qm);
             
@@ -451,48 +468,59 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             	}
             	
 //            	AR
-//            	if (i + 1 < rankk) {
-//            	    SimpleMatrix RR = SimpleMatrix.r randn(k, D.rows);
-//            	    DoubleMatrix v = RR.mult(L);
-//            	    DoubleMatrix Y_temp = new DoubleMatrix(Y.rows + v.rows, Y.columns);
-//            	    Y_temp.put(new Indices(0, Y.rows), 0, Y);
-//            	    Y_temp.put(new Indices(Y.rows, Y_temp.rows), 0, v);
-//            	    Y = Y_temp;
-//            	}
+            	if (i + 1 < rankk) {
+            	    SimpleMatrix RR = SimpleMatrix.random(k, ok.numRows(), 0, 1, new Random());  
+            	    SimpleMatrix v = RR.mult(L);
+            	    Y = Y.combine(2, 0, v);
+            	}
 
             	i++;
             }
             L = X.mult(Y);
             
+            System.out.println(L.numRows()+" "+L.numCols());
             if (ok.numRows() > ok.numCols()){
             	L = L.transpose();
             	S = S.transpose();
             	ok = ok.transpose();
             }
-           
+            System.out.println(L.numRows()+" "+L.numCols());
+//            S.saveToFileCSV("S.csv");
+           S.saveToFileCSV("S.csv");
             
-            double[][][] A2 = matrix2Array(ok);
-            double[][][] L2 = matrix2Array(L);
-            double[][][] S2 = matrix2Array(S);
+            double[][] A2 = matrix2Array2(ok);
+            double[][] L2 = matrix2Array2(L);
+            double[][] S2 = matrix2Array2(S);
+            SimpleMatrix noir = new SimpleMatrix(L.numRows(), L.numCols());
+            noir.zero();
+            noir.set(153.0);
+            
+            double [][] noir2 = matrix2Array2(noir);
+            
+            
             
         	
-            ImagePlus original = new ImagePlus (" Original Image ", constructImageStack (
+            ImagePlus original = new ImagePlus (" Original Image ", constructImageStack2 (
             		A2, type) ) ;
-            ImagePlus im = new ImagePlus (" Background Image ", constructImageStack (
+            ImagePlus im = new ImagePlus (" Background Image ", constructImageStack2 (
             		L2, type) ) ;
-            ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack (
+            ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack2 (
             		S2, type) ) ;
+            
+            ImagePlus imnoir = new ImagePlus (" Sparse Image ", constructImageStack2 (
+            		noir2, type) ) ;
             
             im.show();
             im2.show();
             original.show();
+            imnoir.show();
             
             /*
              * Maybe will be useful
              */
             
             // load the dataset
-            final Dataset dataset = ij.scifio().datasetIO().open(file.getPath());
+//            final Dataset dataset = ij.scifio().datasetIO().open(file.getPath());
 //            
 //            Img img = dataset.getImgPlus().getImg();
 //            
@@ -575,16 +603,31 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     	
     	return newStack;
     }
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    private static ImageStack constructImageStack2 ( double [][] matrix , int bit ) {    	
+    	ImageStack newStack = new ImageStack (width, height) ;
+        for (int z = 0; z < nbSlices ; z ++) {
+        	byte[] pixels = new byte[width*height];
+        	for (int i = 0; i < pixels.length; i++) {
+        	    pixels[i] = (byte) matrix[z][i];
+        	}
+            ByteProcessor bp = new ByteProcessor(width, height, pixels);
+                    
+            newStack.addSlice(bp);
+        }
+    	
+    	return newStack;
+    }
 /*-----------------------------------------------------------------------------------------------------------------------*/
-//    private static double[][] matrix2Array(SimpleMatrix matrix) {
-//        double[][] array = new double[matrix.numRows()][matrix.numCols()];
-//        for (int r = 0; r < matrix.numRows(); r++) {
-//            for (int c = 0; c < matrix.numCols(); c++) {
-//                array[r][c] = matrix.get(r, c);
-//            }
-//        }
-//        return array;
-//    }
+    private static double[][] matrix2Array2(SimpleMatrix matrix) {
+        double[][] array = new double[matrix.numRows()][matrix.numCols()];
+        for (int r = 0; r < matrix.numRows(); r++) {
+            for (int c = 0; c < matrix.numCols(); c++) {
+                array[r][c] = matrix.get(r, c);
+            }
+        }
+        return array;
+    }
 /*-----------------------------------------------------------------------------------------------------------------------*/
     private static SimpleMatrix thresholding(SimpleMatrix S) {
     	for (int i = 0; i < S.numRows(); i++) {
@@ -659,6 +702,18 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 	            }
 	        }
 	        return array;
-	    }	
+	    }
+	 
+	 private static double[][][] matrix2Array3(SimpleMatrix matrix) {
+	        double[][][] array = new double[nbSlices][width][height];
+	        for (int r = 0; r < matrix.numRows(); r++) {
+	            for (int c = 0; c < matrix.numCols(); c++) {
+	                int row = (c % (width*height)) / height;
+	                int col = (c % (width*height)) % height;
+	                array[r][row][col] = matrix.get(r, c);
+	            }
+	        }
+	        return array;
+	    }
 	
 }
