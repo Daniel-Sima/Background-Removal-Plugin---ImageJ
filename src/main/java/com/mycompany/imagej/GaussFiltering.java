@@ -21,6 +21,7 @@ import org.scijava.plugin.Plugin;
 import org.scijava.ui.UIService;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,29 +117,34 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static MODE mode = MODE . SOFT ;
     private enum MODE { SOFT , HARD ; }
     private static int height, width, nbSlices, type ;
-
+  
     public static void main(final String... args) throws Exception {
         // create the ImageJ application context with all available services
-        final ImageJ ij = new ImageJ();
+        final ImageJ ij = new ImageJ(); 
+        
+        // affiche l'interface utilisateur pour acceder aux functionnalites 
         ij.ui().showUI();
-
+        
         // ask the user for a file to open
         final File file = ij.ui().chooseFile(null, "open");
-
+        
+        // si le fichier choisi est bon
         if (file != null) {
+        	// verification qu'il s'agit d'un .tif ou .tiff ou .avi
+        	importImage(file, 0);  
         	
-        	importImage(file, 0);
-        	
-        	ImagePlus imp = IJ.openImage(file.getPath());
-        	int stackSize = imp.getStackSize();
-            int ImgHeight = imp.getHeight();
-            int ImgWidth = imp.getWidth();
-                      
+        	// recuperation des donnees
+        	ImagePlus imp = IJ.openImage(file.getPath());  // image
+        	int stackSize = imp.getStackSize();	// nombre de frames
+            int ImgHeight = imp.getHeight();	// hauteur
+            int ImgWidth = imp.getWidth();	// largeur
+                    
+            // FIXME probleme s'il y a qu'une seule frame ?
             if ( imp.getStackSize() < 2) {
             	IJ.error (" Stack required ");
             	return;
-            } else {
-            	nbSlices = stackSize;
+            } else { // si plusieurs frames
+            	nbSlices = stackSize; 
             	if( imp.getType() == ImagePlus.GRAY8 ) type = 8;
             	else 
             		if( imp.getType () == ImagePlus.GRAY16 ) type = 16;
@@ -162,7 +168,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         	d.showDialog() ;
         	if( d.wasCanceled() ) return ;
         	
-        	tau = d.getNextNumber() ;
+        	// recuperation de la valeur saisie par l'user
+        	tau = d.getNextNumber() ; 
         	int c = d.getNextChoiceIndex() ;
         	if( c == 0) mode = MODE.SOFT ;
         	else mode = MODE.HARD ;
@@ -175,47 +182,160 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             System.out.println(mode);
             
             double[][][] matrix = constructMatrix(imp.getStack(), type) ;
+            System.out.println("======================");
+            System.out.println(matrix.length);
+            System.out.println(matrix[0].length);
+            System.out.println(matrix[0][0].length);
+            System.out.println("======================"+height);
             
             /*
              * SVD 
              */
-            SimpleMatrix A = new SimpleMatrix(matrix[0]);
-                     
-            SimpleSVD<SimpleMatrix> svd = A.svd();
+            int nb = 0; // 12h30
+            SimpleMatrix ok = new SimpleMatrix(nbSlices, height*width);
+            for (int i=0; i<nbSlices; i++) {
+            	for (int j=0; j<width; j++) {
+            		for (int e=0; e<height; e++) {
+            			ok.set(i, nb, matrix[i][j][e]);
+            			nb++;
+            		}
+            	}
+            	nb = 0;
+            }
+            
+            ok.printDimensions();
+            ok = ok.transpose();
+            ok.printDimensions();
+            ok.saveToFileCSV("OK.csv"); 
+            
+            for (int i=0; i<ok.numCols(); i++) {
+            	if (i%25==0) {
+            		System.out.println();
+            	}
+            	System.out.print(ok.get(99, i)+" ");
+            }
+            System.out.println();
+            
+ 
+         
+//            SimpleMatrix A = new SimpleMatrix(matrix[0]);
 
+            
+            
+            System.out.println("++++++++++++++++++++++++");
             SimpleMatrix U=null,W=null,V=null, check = null;
-            
-			double [] Svd = null;
-            Svd = svd.getSVD().getSingularValues();
+            @SuppressWarnings("unchecked")
+			SimpleSVD<SimpleMatrix> svd = ok.svd(true); // compacte pour aller plus vite ...
+//			double [] Svd = null;
+//            Svd = svd.getSVD().getSingularValues();
+            System.out.println("======================");
             U=svd.getU();
+            System.out.println(U.getNumElements());
+            System.out.println("======================");
             W=svd.getW();
+            System.out.println(W.getNumElements());
+            System.out.println("======================");
             V=svd.getV(); 
-            SimpleMatrix X = svd.getU().extractMatrix(0, U.numRows(), 0, k);
-            SimpleMatrix Y = svd.getV().extractMatrix(0, k, 0, V.numCols());
+            System.out.println(W.getNumElements());
+            System.out.println("======================");
+            
+            SimpleMatrix X = svd.getU().extractMatrix(0, U.numRows(), 0, k); // CMMT
+            System.out.println("X: "+X.getNumElements());
+//            X.print();
+//            X.saveToFileCSV("X.csv");
+            SimpleMatrix invX = new SimpleMatrix(X.numRows(), X.numCols());
+            for (int e=X.numCols()-1, i=0; i<X.numCols(); i++, e--) {
+            	for (int j=0; j<X.numRows(); j++) {
+            		invX.set(j, e, X.get(j, i));
+            	}
+            }
+            
+            // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un - 
+            SimpleMatrix negatif = SimpleMatrix.diag(1, -1);
+            invX = invX.mult(negatif);
+            invX.saveToFileCSV("invX.csv");
+            
+            
+            System.out.println("-------------------------");
+            SimpleMatrix Y = svd.getV().extractMatrix(0, k, 0, V.numCols()); // CMMT
+            System.out.println("Y: "+Y.getNumElements());
+            Y.transpose(); // pour l'affichage csv
+            Y.saveToFileCSV("Y.csv");
+            Y.transpose(); // remise comme avant
+            System.out.println("-------------------------");
             SimpleMatrix s = svd.getW().extractMatrix(0, k, 0, k);
+            System.out.println("s: "+s.getNumElements());
+            SimpleMatrix ss = s.extractDiag(); 
+            ss.print();
+            double[] valS = new double[ss.numRows()];
+            for (int j=0, i=ss.numRows()-1; i>=0; i--, j++) {
+            	System.out.println(i);
+            	valS[j] = ss.get(i, 0);
+            }
+//            System.out.println(valS[0]+" "+valS[1]);
+            SimpleMatrix ssi = SimpleMatrix.diag(valS);
+            ssi.print();
+            ssi.saveToFileCSV("S.csv");
+            System.out.println("-------------------------");
+//            SimpleMatrix vectX1 = X.extractVector(false, 0);
+//            vectX1.print();
             
-            X = X.mult(s);
+//      
+           
+         
+//            
+//            X = invX.mult(ssi); 
+//            X.saveToFileCSV("X.csv");
+            
+            System.out.println("X: "+X.getNumElements());
+            
+            
+//            SimpleMatrix invY = new SimpleMatrix(Y.numRows(), Y.numCols());
+//            for (int e=Y.numCols()-1, i=0; i<Y.numCols(); i++, e--) {
+//            	for (int j=0; j<Y.numRows(); j++) {
+//            		invY.set(j, e, Y.get(j, i));
+//            	}
+//            }
+//            double[] valNeg = new double[100];
+//            for (int i=0; i<100; i++) {
+//            	valNeg[i] = -1;
+//            }
+            
+//            SimpleMatrix negatif2 = SimpleMatrix.diag(valNeg);
+//            
+//            Y = Y.mult(negatif2);
+//            (Y.transpose()).saveToFileCSV("Y.csv");
             SimpleMatrix L = X.mult(Y);
-            
-            SimpleMatrix S = A.minus(L);
+//            L.saveToFileCSV("L.csv");
+            System.out.println("-------------------------");
+
+            System.out.println("L: "+L.getNumElements());
+            SimpleMatrix S = ok.minus(L);
+            	
             
             //thresholding
-            S = thresholding(S);        
+//            S = thresholding(S);  
+            S = threshold(S, tau, "soft");
+//            S.saveToFileCSV("S.csv");
+            System.out.println("+++++++++++++++++++++++++++++++++++++");
             
             double result = (double) rank / k;
             int rankk = (int) Math.round(result);
             SimpleMatrix error = new SimpleMatrix(rank * power, 1);
-            SimpleMatrix T = (A.minus(L)).minus(S);
-            double normD = A.normF();
+            SimpleMatrix T = (ok.minus(L)).minus(S);
+            double normD = ok.normF();
             double normT = T.normF();
             
             error.set(0, (double) normT / normD);
+            error.print();
             
             int iii = 1;
             boolean stop = false;
             double alf = 0;
             
-            for(int i=0; i<rankk; i++) {
+            for(int i=1; i<rankk+1; i++) {
+            	System.out.println(i);
+            	i = i-1;
             	int rrank = rank;
             	int est_rank = 1;
             	alf = 0;
@@ -228,8 +348,13 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             	for(int j=1; j<power+1; j++) {
             		
             		//update X 
-            		//TODO: absolute values 
             		X = (L.mult(Y.transpose()));
+            		for (int k=0; k<X.numCols(); k++) {
+            			for (int l=0; l<X.numRows(); l++) {
+            				X.set(l, k, Math.abs(X.get(l, k)));
+            			}
+            		}
+            		
             		
             		DenseMatrix64F X2 = X.getMatrix();
             		
@@ -246,9 +371,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     L = X.mult(Y);
                     
                     // Update of S
-                    T = A.minus(L);
+                    T = ok.minus(L);
                     //thresholding
-                    S = thresholding(T);
+//                    S = thresholding(T);
+                    S = threshold(T, tau, "soft");
                     
                     // Error, stopping criteria
                     T = T.minus(S);
@@ -260,6 +386,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     
                     if (error.get(ii) < tol) {
                     	stop = true;
+                    	System.out.println("STOPPPPPPPPPP");
                     	break;
                     }
                         
@@ -303,27 +430,62 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     S1 = S;
                     T1 = T;
                     L = L.plus(T.scale(1+alf));
-  
+                    
+                    // Add corest AR
+                    if (j > 8) {
+                        double mean = mean(error, ii - 7, ii);
+                        if (mean > 0.92) {
+                            iii = ii;
+                            int YRow = Y.numRows();
+                            int XRow = X.numRows();
+                            if ((YRow - XRow) >= k) {
+                                Y = Y.extractMatrix(0, XRow - 1, 0, Y.numCols());
+                            }
+                            break;
+                        }
+                    }
             	}
             	
             	if( stop == true) {
             		break;
             	}
+            	
+//            	AR
+//            	if (i + 1 < rankk) {
+//            	    SimpleMatrix RR = SimpleMatrix.r randn(k, D.rows);
+//            	    DoubleMatrix v = RR.mult(L);
+//            	    DoubleMatrix Y_temp = new DoubleMatrix(Y.rows + v.rows, Y.columns);
+//            	    Y_temp.put(new Indices(0, Y.rows), 0, Y);
+//            	    Y_temp.put(new Indices(Y.rows, Y_temp.rows), 0, v);
+//            	    Y = Y_temp;
+//            	}
 
+            	i++;
             }
             L = X.mult(Y);
+            
+            if (ok.numRows() > ok.numCols()){
+            	L = L.transpose();
+            	S = S.transpose();
+            	ok = ok.transpose();
+            }
            
             
-            double[][] L2 = matrix2Array(L);
-            double[][] S2 = matrix2Array(S);
+            double[][][] A2 = matrix2Array(ok);
+            double[][][] L2 = matrix2Array(L);
+            double[][][] S2 = matrix2Array(S);
+            
         	
+            ImagePlus original = new ImagePlus (" Original Image ", constructImageStack (
+            		A2, type) ) ;
             ImagePlus im = new ImagePlus (" Background Image ", constructImageStack (
-            		L2, type ) ) ;
+            		L2, type) ) ;
             ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack (
-            		S2, type ) ) ;
+            		S2, type) ) ;
             
             im.show();
             im2.show();
+            original.show();
             
             /*
              * Maybe will be useful
@@ -351,7 +513,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
     }
     
-    
+/*-----------------------------------------------------------------------------------------------------------------------*/
     public static void importImage(File file, int maxFrames) {
         String fileExtension = getFileExtension(file);
 
@@ -364,14 +526,14 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             throw new RuntimeException("The file extension should be .tif, .tiff or .avi.");
         }
     }
-    
+/*-----------------------------------------------------------------------------------------------------------------------*/
     public static String getFileExtension(File file) {
         String fileName = file.getName();
         if(fileName.lastIndexOf(".") != -1 && fileName.lastIndexOf(".") != 0)
         return fileName.substring(fileName.lastIndexOf(".")+1);
         else return "";
     }
-    
+/*-----------------------------------------------------------------------------------------------------------------------*/   
     /*
      * Code from last year's project
      */
@@ -399,27 +561,31 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     	}
     	return matrix ;
     }
-    
-    private static ImageStack constructImageStack ( double [][] matrix , int bit ) {
+/*-----------------------------------------------------------------------------------------------------------------------*/
+    private static ImageStack constructImageStack ( double [][][] matrix , int bit ) {
     	ImageStack newStack = new ImageStack ( width , height ) ;
-    	ByteProcessor bp = new ByteProcessor ( width , height ) ;
-    	for ( int i = 0; i < width ; i ++)
-    		for ( int j = 0; j < height ; j ++)
-    			bp.putPixel (i , j , ( int ) matrix[ i ][ j ]) ;
-    	newStack . addSlice ( bp ) ;
+        for (int z = 0; z < nbSlices ; z ++) {
+            ByteProcessor bp = new ByteProcessor(width, height);
+
+            for (int i = 0; i < width; i++)
+                for (int j = 0; j < height; j++)
+                    bp.putPixel(i, j, (int) matrix[z][i][j]);
+            newStack.addSlice(bp);
+        }
     	
     	return newStack;
     }
-    private static double[][] matrix2Array(SimpleMatrix matrix) {
-        double[][] array = new double[matrix.numRows()][matrix.numCols()];
-        for (int r = 0; r < matrix.numRows(); r++) {
-            for (int c = 0; c < matrix.numCols(); c++) {
-                array[r][c] = matrix.get(r, c);
-            }
-        }
-        return array;
-    }
-    
+/*-----------------------------------------------------------------------------------------------------------------------*/
+//    private static double[][] matrix2Array(SimpleMatrix matrix) {
+//        double[][] array = new double[matrix.numRows()][matrix.numCols()];
+//        for (int r = 0; r < matrix.numRows(); r++) {
+//            for (int c = 0; c < matrix.numCols(); c++) {
+//                array[r][c] = matrix.get(r, c);
+//            }
+//        }
+//        return array;
+//    }
+/*-----------------------------------------------------------------------------------------------------------------------*/
     private static SimpleMatrix thresholding(SimpleMatrix S) {
     	for (int i = 0; i < S.numRows(); i++) {
             for (int j = 0; j < S.numCols(); j++) {
@@ -435,10 +601,64 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return S;
     }
-   
-
-    
-    
-    
-
+/*-----------------------------------------------------------------------------------------------------------------------*/
+    public static SimpleMatrix threshold(SimpleMatrix data, double tau, String mode) {
+        int rows = data.numRows();
+        int cols = data.numCols();
+        SimpleMatrix result = new SimpleMatrix(rows, cols);
+        if (mode.equals("soft")) {
+            for (int i = 0; i < rows; i++) {
+                for (int j = 0; j < cols; j++) {
+                    double val = data.get(i, j);
+                    result.set(i, j, Math.max(0, val - tau));
+                }
+            }
+        }
+        else if (mode.equals("hard")) {
+            for (int i = 0; i < rows; i++) {
+                for (int j = 0; j < cols; j++) {
+                    double val = data.get(i, j);
+                    if (val > tau) {
+                        result.set(i, j, val - tau);
+                    }
+                    else if (val < -tau) {
+                        result.set(i, j, val + tau);
+                    }
+                    else {
+                        result.set(i, j, 0);
+                    }
+                }
+            }
+        }
+        else {
+            System.out.println("mode not supported");
+            return null;
+        }
+        return result;
+    }
+/*-----------------------------------------------------------------------------------------------------------------------*/
+	private static double mean(SimpleMatrix matrix, int start, int end) {
+	    double sum = 0;
+	    int count = 0;
+	    for (int i = start; i < end; i++) {
+	        for (int j = 0; j < matrix.numCols(); j++) {
+	            sum += matrix.get(i, j);
+	            count++;
+	        }
+	    }
+	    return sum / count;
+	}
+	
+	 private static double[][][] matrix2Array(SimpleMatrix matrix) {
+	        double[][][] array = new double[nbSlices][width][height];
+	        for (int r = 0; r < matrix.numRows(); r++) {
+	            for (int c = 0; c < matrix.numCols(); c++) {
+	                int row = (c % (width*height)) / height;
+	                int col = (c % (width*height)) % height;
+	                array[r][row][col] = matrix.get(r, c);
+	            }
+	        }
+	        return array;
+	    }	
+	
 }
