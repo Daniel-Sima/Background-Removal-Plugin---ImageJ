@@ -20,6 +20,8 @@ import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 import org.scijava.ui.UIService;
 
+import Jama.Matrix;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
@@ -38,19 +40,23 @@ import ij.process.ImageConverter;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 
+import org.ejml.alg.dense.decomposition.qr.QRDecompositionHouseholderColumn;
 import org.ejml.data.DMatrixRMaj;
 import org.ejml.data.DMatrixSparse;
 import org.ejml.data.DMatrixSparseCSC;
 import org.ejml.data.DenseMatrix64F;
 import org.ejml.dense.row.SingularOps_DDRM;
+import org.ejml.dense.row.decomposition.qr.QRDecompositionHouseholderColumn_DDRM;
 import org.ejml.dense.row.factory.DecompositionFactory_DDRM;
 import org.ejml.factory.DecompositionFactory;
+import org.ejml.factory.DecompositionInterface;
 import org.ejml.factory.LinearSolver;
 import org.ejml.factory.LinearSolverFactory;
 import org.ejml.factory.QRDecomposition;
 import org.ejml.interfaces.decomposition.SingularValueDecomposition;
 import org.ejml.interfaces.decomposition.SingularValueDecomposition_F64;
 import org.ejml.ops.CommonOps;
+import org.ejml.ops.SingularOps;
 import org.ejml.simple.SimpleMatrix;
 import org.ejml.simple.SimpleSVD;
 
@@ -243,6 +249,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             SimpleMatrix U=null,W=null,V=null, check = null;
             @SuppressWarnings("unchecked")
 			SimpleSVD<SimpleMatrix> svd = ok.svd(true); // compacte pour aller plus vite ...
+            
 //			double [] Svd = null;
 //            Svd = svd.getSVD().getSingularValues();
             System.out.println("======================");
@@ -257,7 +264,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             System.out.println("======================");
             
             SimpleMatrix X = svd.getU().extractMatrix(0, U.numRows(), 0, k); // CMMT
-            System.out.println("X: "+X.getNumElements());
+            System.out.println("X: "+X.getNumElements()+" ("+X.numRows()+", "+X.numCols()+")");
 //            X.print();
 //            X.saveToFileCSV("X.csv");
             SimpleMatrix invX = new SimpleMatrix(X.numRows(), X.numCols());
@@ -275,10 +282,37 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             
             System.out.println("-------------------------");
             SimpleMatrix Y = svd.getV().extractMatrix(0, k, 0, V.numCols()); // CMMT
-            System.out.println("Y: "+Y.getNumElements());
-            Y.transpose(); // pour l'affichage csv
-            Y.saveToFileCSV("Y.csv");
-            Y.transpose(); // remise comme avant
+            SimpleMatrix Ytest = svd.getV().extractMatrix(0, V.numCols(), 0, k); // CMMT
+//            Ytest = Ytest.scale(-1);
+            SimpleMatrix invY = new SimpleMatrix(Ytest.numRows(), Ytest.numCols());
+            for (int e=Ytest.numCols()-1, i=0; i<Ytest.numCols(); i++, e--) {
+            	for (int j=0; j<Ytest.numRows(); j++) {
+            		invY.set(j, e, Ytest.get(j, i));
+            	}
+            }
+//            SimpleMatrix negatif2 = SimpleMatrix.diag(1, 1);
+            invY = invY.mult(negatif);
+            
+            invY = invY.transpose();  
+            
+            invY.saveToFileCSV("Ytest.csv");
+            System.out.println("Y: "+Y.getNumElements()+" ("+Y.numRows()+", "+Y.numCols()+")");
+//            Y.transpose(); // pour l'affichage csv
+//            Y.saveToFileCSV("Y.csv");
+//            Y.transpose(); // remise comme avant
+            
+//            SimpleMatrix invY = new SimpleMatrix(Y.numRows(), Y.numCols());
+//            for (int e=Y.numCols()-1, i=0; i<Y.numCols(); i++, e--) {
+//            	for (int j=0; j<Y.numRows(); j++) {
+//            		invX.set(j, e, Y.get(j, i));
+//            	}
+//            }
+            
+//            // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un - 
+//            SimpleMatrix negatif2 = SimpleMatrix.diag(1, -1);
+//            invX = invX.mult(negatif);
+//            invX.saveToFileCSV("invX.csv");
+            
             System.out.println("-------------------------");
             SimpleMatrix s = svd.getW().extractMatrix(0, k, 0, k);
             System.out.println("s: "+s.getNumElements());
@@ -292,7 +326,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //            System.out.println(valS[0]+" "+valS[1]);
             SimpleMatrix ssi = SimpleMatrix.diag(valS);
             ssi.print();
-            ssi.saveToFileCSV("S.csv");
+//            ssi.saveToFileCSV("S.csv");
             System.out.println("-------------------------");
 //            SimpleMatrix vectX1 = X.extractVector(false, 0);
 //            vectX1.print();
@@ -301,8 +335,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
            
          
 //            
-//            X = invX.mult(ssi); 
-//            X.saveToFileCSV("X.csv");
+            X = invX.mult(ssi); 
+            X.saveToFileCSV("X.csv");
             
             System.out.println("X: "+X.getNumElements());
             
@@ -313,17 +347,20 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //            		invY.set(j, e, Y.get(j, i));
 //            	}
 //            }
+//            
 //            double[] valNeg = new double[100];
 //            for (int i=0; i<100; i++) {
 //            	valNeg[i] = -1;
 //            }
-            
+//            
 //            SimpleMatrix negatif2 = SimpleMatrix.diag(valNeg);
 //            
-//            Y = Y.mult(negatif2);
+//            Y = invY.mult(negatif2);
 //            (Y.transpose()).saveToFileCSV("Y.csv");
+            Y = invY;
             SimpleMatrix L = X.mult(Y);
-//            L.saveToFileCSV("L.csv");
+            L.saveToFileCSV("L.csv");
+            System.out.println("L: "+L.getNumElements()+" ("+L.numRows()+", "+L.numCols()+")");
             System.out.println("-------------------------");
 
             System.out.println("L: "+L.getNumElements());
@@ -372,17 +409,23 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             			}
             		}
             		
+            		 if (j==2 && i==1) {
+                     	X.saveToFileCSV("Y.csv");
+                 		System.out.println("mataaa");
+                 		System.out.println("222");
+                     }
+            		 		
             		
             		DenseMatrix64F X2 = X.getMatrix();
             		
-            		// Do a QR decomposition
-                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X.numRows(), X.numCols());
+            		// Do a QR decomposition 
+            		/* Possible qu'ici la decomposition se fasse mal */
+                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
                     qr.decompose(X2);
-                    DenseMatrix64F qm = qr.getQ(null, true);
-//                    DenseMatrix64F rm = qr.getR(null, true);
+                    X = SimpleMatrix.wrap(qr.getQ(null, true));
                     
-                    X = SimpleMatrix.wrap(qm);
-            
+                   
+            		
                     // Update of Y
                     Y = (X.transpose()).mult(L);
                     L = X.mult(Y);
@@ -392,6 +435,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     //thresholding
 //                    S = thresholding(T);
                     S = threshold(T, tau, "soft");
+                    
                     
                     // Error, stopping criteria
                     T = T.minus(S);
@@ -408,6 +452,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     }
                         
                     if (rrank != rank) {
+                    	System.out.println("AICI BA");
                     	rank = rrank;
                     	if(est_rank == 0) {
                     		alf = 0;
@@ -427,6 +472,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     
                     
                     if (ratio >= 1.1) {
+//                    	System.out.println("1er");
                     	increment = Math.max(0.1 * alf, 0.1 * increment);
                     	X = X1;
                         Y = Y1;
@@ -436,6 +482,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                         error.set(ii, error.get(ii-1));
                         alf = 0;
                     }else if (ratio > 0.7) {
+//                    	System.out.println("2eme");
                     	increment = Math.max(increment, 0.25 * alf);
                         alf = alf + increment;
                     }
@@ -450,6 +497,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     
                     // Add corest AR
                     if (j > 8) {
+                    	System.out.println("PULA");
                         double mean = mean(error, ii - 7, ii);
                         if (mean > 0.92) {
                             iii = ii;
@@ -461,6 +509,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                             break;
                         }
                     }
+                    
+                    
             	}
             	
             	if( stop == true) {
@@ -469,14 +519,27 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             	
 //            	AR
             	if (i + 1 < rankk) {
-            	    SimpleMatrix RR = SimpleMatrix.random(k, ok.numRows(), 0, 1, new Random());  
+            		Random r = new Random();
+            	    SimpleMatrix RR = new SimpleMatrix(k, ok.numRows());
+            	    for (int x=0; x<k; x++) {
+            	    	for (int z=0; z<ok.numRows(); z++) {
+//            	    		RR.set(x, z, r.nextGaussian());
+            	    		RR.set(x, z, 1.0);
+            	    	}
+            	    }
+            	    
             	    SimpleMatrix v = RR.mult(L);
-            	    Y = Y.combine(2, 0, v);
+            	    Y = Y.combine(2, 0, v); 
             	}
-
+//            	Y.saveToFileCSV("Y.csv");
+//        		System.out.println("mataaa");
+//        		System.out.println("222");
+            		
             	i++;
+            	
             }
             L = X.mult(Y);
+            
             
             System.out.println(L.numRows()+" "+L.numCols());
             if (ok.numRows() > ok.numCols()){
@@ -486,7 +549,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             }
             System.out.println(L.numRows()+" "+L.numCols());
 //            S.saveToFileCSV("S.csv");
-           S.saveToFileCSV("S.csv");
+//           S.saveToFileCSV("S.csv");
             
             double[][] A2 = matrix2Array2(ok);
             double[][] L2 = matrix2Array2(L);
@@ -653,7 +716,11 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < cols; j++) {
                     double val = data.get(i, j);
-                    result.set(i, j, Math.max(0, val - tau));
+                    if (Math.abs(val) < tau) {
+                    	result.set(i, j, 0);
+                    } else {
+                    	result.set(i, j, (val/Math.abs(val) * Math.max(Math.abs(val) - tau, 0)));
+                    }
                 }
             }
         }
@@ -661,14 +728,11 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < cols; j++) {
                     double val = data.get(i, j);
-                    if (val > tau) {
-                        result.set(i, j, val - tau);
-                    }
-                    else if (val < -tau) {
-                        result.set(i, j, val + tau);
+                    if (Math.abs(val) < tau) {
+                        result.set(i, j, 0);
                     }
                     else {
-                        result.set(i, j, 0);
+                    	result.set(i, j, val);
                     }
                 }
             }
@@ -715,5 +779,5 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 	        }
 	        return array;
 	    }
-	
+	 	
 }
