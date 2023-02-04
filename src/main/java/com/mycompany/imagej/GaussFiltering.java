@@ -15,6 +15,7 @@ import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgs;
 import net.imglib2.type.numeric.RealType;
+import org.ejml.ops.NormOps;
 import org.scijava.command.Command;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
@@ -245,210 +246,247 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
             // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
             SimpleMatrix negatif = SimpleMatrix.diag(1, -1);
-//            invX = invX.mult(negatif);
+            DenseMatrix64F neg = negatif.getMatrix();
+
+            DenseMatrix64F Res = new DenseMatrix64F(invX.numRows, neg.numCols);
+            CommonOps.mult(invX, neg, Res);
+
+            DenseMatrix64F Y = new DenseMatrix64F(V.numCols, k);
+            CommonOps.extract(V, 0, V.numCols, 0, k, Y, 0, 0);
+
+            DenseMatrix64F invY = new DenseMatrix64F(Y.numRows, Y.numCols);
+            for (int e=Y.numCols-1, i=0; i<Y.numCols; i++, e--) {
+                for (int j=0; j<Y.numRows; j++) {
+                    invY.set(j, e, Y.get(j, i));
+                }
+            }
+
+            DenseMatrix64F ResY = new DenseMatrix64F(invY.numRows, neg.numCols);
+            CommonOps.mult(invY, neg, ResY);
+
+            DenseMatrix64F ResYTrans = new DenseMatrix64F(ResY.numCols, ResY.numRows);
+            CommonOps.transpose(ResY, ResYTrans);
+
+            ResY = ResYTrans;
+
+            DenseMatrix64F s = new DenseMatrix64F(k, k);
+            CommonOps.extract(W, 0, k, 0, k, s, 0, 0);
+
+            DenseMatrix64F diagonal = new DenseMatrix64F(s.numRows, 1);
+            CommonOps.extractDiag(s, diagonal);
+            double[] valS = new double[diagonal.numRows];
+            for (int j=0, i=diagonal.numRows-1; i>=0; i--, j++) {
+            	valS[j] = diagonal.get(i, 0);
+            }
+
+            SimpleMatrix ssi = SimpleMatrix.diag(valS);
+            DenseMatrix64F ssii = ssi.getMatrix();
+
+            DenseMatrix64F resMulX = new DenseMatrix64F(Res.numRows, ssii.numCols);
+            CommonOps.mult(Res, ssii, resMulX);
+
+            DenseMatrix64F L = new DenseMatrix64F(resMulX.numRows, ResY.numCols);
+            CommonOps.mult(resMulX, ResY, L);
+
+            DenseMatrix64F S = new DenseMatrix64F(ok.numRows, ok.numCols);
+            CommonOps.sub(ok, L, S);
+
+            DenseMatrix64F Sshold = threshold(S, tau, "soft");
 //
-//            SimpleMatrix Y = svd.getV().extractMatrix(0, k, 0, V.numCols()); // CMMT
-//            SimpleMatrix Ytest = svd.getV().extractMatrix(0, V.numCols(), 0, k); // CMMT
-//            SimpleMatrix invY = new SimpleMatrix(Ytest.numRows(), Ytest.numCols());
-//            for (int e=Ytest.numCols()-1, i=0; i<Ytest.numCols(); i++, e--) {
-//            	for (int j=0; j<Ytest.numRows(); j++) {
-//            		invY.set(j, e, Ytest.get(j, i));
-//            	}
-//            }
+            double result = (double) rank / k;
+            int rankk = (int) Math.round(result);
+            SimpleMatrix error = new SimpleMatrix(rank * power, 1);
+
+            DenseMatrix64F T = new DenseMatrix64F(S.numRows, S.numCols);
+            assert Sshold != null;
+            CommonOps.sub(S, Sshold, T);
+
+            double normD = NormOps.normF(ok);
+            double normT = NormOps.normF(T);
+
+            error.set(0, normT / normD);
+
+            int iii = 1;
+            boolean stop = false;
+            double alf = 0;
 //
-//            invY = invY.mult(negatif);
-//
-//            invY = invY.transpose();
-//
-//            SimpleMatrix s = svd.getW().extractMatrix(0, k, 0, k);
-//            SimpleMatrix ss = s.extractDiag();
-//
-//            double[] valS = new double[ss.numRows()];
-//            for (int j=0, i=ss.numRows()-1; i>=0; i--, j++) {
-//            	valS[j] = ss.get(i, 0);
-//            }
-//
-//            SimpleMatrix ssi = SimpleMatrix.diag(valS);
-//
-//            X = invX.mult(ssi);
-//
-//            Y = invY;
-//            SimpleMatrix L = X.mult(Y);
-//
-//            SimpleMatrix S = ok.minus(L);
-//
-//            S = threshold(S, tau, "soft");
-//
-//            double result = (double) rank / k;
-//            int rankk = (int) Math.round(result);
-//            SimpleMatrix error = new SimpleMatrix(rank * power, 1);
-//            SimpleMatrix T = (ok.minus(L)).minus(S);
-//            double normD = ok.normF();
-//            double normT = T.normF();
-//
-//            error.set(0, (double) normT / normD);
-//
-//            int iii = 1;
-//            boolean stop = false;
-//            double alf = 0;
-//
-//            for(int i=1; i<rankk+1; i++) {
-//            	i = i-1;
-//            	int rrank = rank;
-//            	int est_rank = 1;
-//            	alf = 0;
-//            	double increment = 1;
-//
-//            	if (iii == power * (i - 2) + 1) {
-//            		iii = iii + power;
-//            	}
-//
-//            	for(int j=1; j<power+1; j++) {
-//
-//            		//update X
-//            		X = (L.mult(Y.transpose()));
-//            		for (int k=0; k<X.numCols(); k++) {
-//            			for (int l=0; l<X.numRows(); l++) {
-//            				X.set(l, k, Math.abs(X.get(l, k)));
-//            			}
-//            		}
-//
-//                    DenseMatrix64F X2 = X.getMatrix();
-//
-//            		// Do a QR decomposition
-//            		/* Possible qu'ici la decomposition se fasse mal */
-//
-//                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
-//                    qr.decompose(X2);
-//                    X = SimpleMatrix.wrap(qr.getQ(null, true));
-//
-//                    if (j==1 && i==1) {
-//                        X.saveToFileCSV("Y.csv");
-//                    }
-//
-//
-//                    // Update of Y
-//                    Y = (X.transpose()).mult(L);
-//                    L = X.mult(Y);
-//
-//                    // Update of S
-//                    T = ok.minus(L);
-//                    //thresholding
-//                    S = threshold(T, tau, "soft");
-//
-//
-//                    // Error, stopping criteria
-//                    T = T.minus(S);
-//                    int ii = iii + j - 1;
-//
-//                    normT = T.normF();
-//
-//                    error.set(ii, (double) normT / normD);
-//
-//                    if (error.get(ii) < tol) {
-//                    	stop = true;
-//                    	System.out.println("STOPPPPPPPPPP");
-//                    	break;
-//                    }
-//
-//                    if (rrank != rank) {
-//                    	System.out.println("AICI BA");
-//                    	rank = rrank;
-//                    }
-//
-//                    // Adjust alf
-//                    double ratio = (double) error.get(ii) / error.get(ii-1);
-//
-//                    // Intermediate variables
-//                    SimpleMatrix X1 = X;
-//                    SimpleMatrix Y1 = Y;
-//                    SimpleMatrix L1 = L;
-//					SimpleMatrix S1 = S;
-//                    SimpleMatrix T1 = T;
-//
-//
-//                    if (ratio >= 1.1) {
-////                    	System.out.println("1er");
-//                    	increment = Math.max(0.1 * alf, 0.1 * increment);
-//                        error.set(ii, error.get(ii-1));
-//                        alf = 0;
-//                    }else if (ratio > 0.7) {
-////                    	System.out.println("2eme");
-//                    	increment = Math.max(increment, 0.25 * alf);
-//                        alf = alf + increment;
-//                    }
-//
-//                    // Update of L
-//                    L = L.plus(T.scale(1+alf));
-//
-//                    // Add corest AR
-//                    if (j > 8) {
-//                    	System.out.println("PULA");
-//                        double mean = mean(error, ii - 7, ii);
-//                        if (mean > 0.92) {
-//                            iii = ii;
-//                            int YRow = Y.numRows();
-//                            int XRow = X.numRows();
-//                            if ((YRow - XRow) >= k) {
-//                                Y = Y.extractMatrix(0, XRow - 1, 0, Y.numCols());
-//                            }
-//                            break;
-//                        }
-//                    }
-//
-//
-//            	}
-//
-//            	if(stop) {
-//            		break;
-//            	}
-//
-////            	AR
-//            	if (i + 1 < rankk) {
-//            		Random r = new Random();
-//            	    SimpleMatrix RR = new SimpleMatrix(k, ok.numRows());
-//            	    for (int x=0; x<k; x++) {
-//            	    	for (int z=0; z<ok.numRows(); z++) {
-////            	    		RR.set(x, z, r.nextGaussian());
+            for(int i=1; i<rankk+1; i++) {
+            	i = i-1;
+            	int rrank = rank;
+            	int est_rank = 1;
+            	alf = 0;
+            	double increment = 1;
+
+            	if (iii == power * (i - 2) + 1) {
+            		iii = iii + power;
+            	}
+
+            	for(int j=1; j<power+1; j++) {
+
+            		//update X
+                    DenseMatrix64F YTrans = new DenseMatrix64F(ResY.numCols, ResY.numRows);
+                    CommonOps.transpose(ResY, YTrans);
+
+                    CommonOps.mult(L, YTrans, X);
+
+            		for (int k=0; k<X.numCols; k++) {
+            			for (int l=0; l<X.numRows; l++) {
+            				X.set(l, k, Math.abs(X.get(l, k)));
+            			}
+            		}
+
+            		// Do a QR decomposition
+            		/* Possible qu'ici la decomposition se fasse mal */
+
+                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X.numRows, X.numCols);
+                    qr.decompose(X);
+                    X = qr.getQ(null, true);
+
+                    if (j==1 && i==1) {
+                        SimpleMatrix.wrap(X).saveToFileCSV("Y.csv");
+                    }
+
+                    // Update of Y
+                    DenseMatrix64F XTrans = new DenseMatrix64F(X.numCols, X.numRows);
+                    CommonOps.transpose(X, XTrans);
+
+                    DenseMatrix64F tempRes = new DenseMatrix64F(XTrans.numRows, L.numCols);
+                    CommonOps.mult(XTrans, L, tempRes);
+
+                    Y = tempRes;
+
+                    CommonOps.mult(X, Y, L);
+
+                    // Update of S
+                    CommonOps.sub(ok, L, T);
+
+                    //thresholding
+                    S = threshold(T, tau, "soft");
+
+                    // Error, stopping criteria
+                    assert S != null;
+                    CommonOps.sub(T, S, T);
+                    int ii = iii + j - 1;
+
+                    normT = NormOps.normF(T);
+
+                    error.set(ii, normT / normD);
+
+                    if (error.get(ii) < tol) {
+                    	stop = true;
+                    	System.out.println("STOPPPPPPPPPP");
+                    	break;
+                    }
+
+                    if (rrank != rank) {
+                    	System.out.println("AICI BA");
+                    	rank = rrank;
+                    }
+
+                    // Adjust alf
+                    double ratio = (double) error.get(ii) / error.get(ii-1);
+
+
+
+                    if (ratio >= 1.1) {
+//                    	System.out.println("1er");
+                    	increment = Math.max(0.1 * alf, 0.1 * increment);
+                        error.set(ii, error.get(ii-1));
+                        alf = 0;
+                    }else if (ratio > 0.7) {
+//                    	System.out.println("2eme");
+                    	increment = Math.max(increment, 0.25 * alf);
+                        alf = alf + increment;
+                    }
+
+                    // Update of L
+                    CommonOps.scale( 1+alf, T, T);
+                    CommonOps.add(L, T, L);
+
+                    // Add corest AR
+                    if (j > 8) {
+                    	System.out.println("PULA");
+                        double mean = mean(error, ii - 7, ii);
+                        if (mean > 0.92) {
+                            iii = ii;
+                            int YRow = Y.numRows;
+                            int XRow = X.numRows;
+                            if ((YRow - XRow) >= k) {
+                                CommonOps.extract(Y, 0, XRow - 1, 0, Y.numCols, Y, 0, 0);
+                            }
+                            break;
+                        }
+                    }
+
+
+            	}
+
+            	if(stop) {
+            		break;
+            	}
+
+//            	AR
+            	if (i + 1 < rankk) {
+            		Random r = new Random();
+                    DenseMatrix64F RR = new DenseMatrix64F(k, ok.numRows);
+            	    for (int x=0; x<k; x++) {
+            	    	for (int z=0; z<ok.numRows; z++) {
+            	    		RR.set(x, z, r.nextGaussian());
 //            	    		RR.set(x, z, 1.0);
-//            	    	}
-//            	    }
-//
-//            	    SimpleMatrix v = RR.mult(L);
-//            	    Y = Y.combine(2, 0, v);
-//            	}
-//
-//            	i++;
-//
-//            }
-//            L = X.mult(Y);
-//
-//
-//            System.out.println(L.numRows()+" "+L.numCols());
-//            if (ok.numRows() > ok.numCols()){
-//            	L = L.transpose();
-//                assert S != null;
-//                S = S.transpose();
-//            	ok = ok.transpose();
-//            }
-//
-//            double[][] A2 = matrix2Array2(ok);
-//            double[][] L2 = matrix2Array2(L);
-//            assert S != null;
-//            double[][] S2 = matrix2Array2(S);
-//
-//
-//            ImagePlus original = new ImagePlus (" Original Image ", constructImageStack2 (
-//            		A2, type) ) ;
-//            ImagePlus im = new ImagePlus (" Background Image ", constructImageStack2 (
-//            		L2, type) ) ;
-//            ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack2 (
-//            		S2, type) ) ;
-//
-//
-//            im.show();
-//            im2.show();
-//            original.show();
+            	    	}
+            	    }
+
+                    DenseMatrix64F v = new DenseMatrix64F(RR.numRows, L.numCols);
+                    CommonOps.mult(RR, L, v);
+
+                    DenseMatrix64F newY = new DenseMatrix64F(Y.numRows*2, Y.numCols);
+                    for (int p = 0; p < Y.numRows; p++) {
+                        for (int q = 0; q < Y.numCols; q++) {
+                            newY.set(p, q, Y.get(p, q) + Y.get(p, q));
+                        }
+                    }
+                    Y = newY;
+            	}
+
+            	i++;
+
+            }
+
+            CommonOps.mult(X, Y, L);
+
+
+            if (ok.numRows > ok.numCols){
+                DenseMatrix64F LTrans = new DenseMatrix64F(L.numCols, L.numRows);
+                CommonOps.transpose(L, LTrans);
+            	L = LTrans;
+
+                assert S != null;
+                DenseMatrix64F STrans = new DenseMatrix64F(S.numCols, S.numRows);
+                CommonOps.transpose(S, STrans);
+                S = STrans;
+
+                DenseMatrix64F okTrans = new DenseMatrix64F(ok.numCols, ok.numRows);
+                CommonOps.transpose(ok, okTrans);
+            	ok = okTrans;
+            }
+
+            double[][] A2 = matrix2Array2(ok);
+            double[][] L2 = matrix2Array2(L);
+            assert S != null;
+            double[][] S2 = matrix2Array2(S);
+
+
+            ImagePlus original = new ImagePlus (" Original Image ", constructImageStack2 (
+            		A2, type) ) ;
+            ImagePlus im = new ImagePlus (" Background Image ", constructImageStack2 (
+            		L2, type) ) ;
+            ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack2 (
+            		S2, type) ) ;
+
+
+            im.show();
+            im2.show();
+            original.show();
             
             /*
              * Maybe will be useful
@@ -554,10 +592,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     	return newStack;
     }
 /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double[][] matrix2Array2(SimpleMatrix matrix) {
-        double[][] array = new double[matrix.numRows()][matrix.numCols()];
-        for (int r = 0; r < matrix.numRows(); r++) {
-            for (int c = 0; c < matrix.numCols(); c++) {
+    private static double[][] matrix2Array2(DenseMatrix64F matrix) {
+        double[][] array = new double[matrix.numRows][matrix.numCols];
+        for (int r = 0; r < matrix.numRows; r++) {
+            for (int c = 0; c < matrix.numCols; c++) {
                 array[r][c] = matrix.get(r, c);
             }
         }
@@ -580,10 +618,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         return S;
     }
 /*-----------------------------------------------------------------------------------------------------------------------*/
-    public static SimpleMatrix threshold(SimpleMatrix data, double tau, String mode) {
-        int rows = data.numRows();
-        int cols = data.numCols();
-        SimpleMatrix result = new SimpleMatrix(rows, cols);
+    public static DenseMatrix64F threshold(DenseMatrix64F data, double tau, String mode) {
+        int rows = data.numRows;
+        int cols = data.numCols;
+        DenseMatrix64F result = new DenseMatrix64F(rows, cols);
         if (mode.equals("soft")) {
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < cols; j++) {
