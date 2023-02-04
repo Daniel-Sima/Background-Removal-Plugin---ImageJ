@@ -25,10 +25,9 @@ import Jama.Matrix;
 
 import java.io.File;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Arrays;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.*;
 
 import ij.IJ;
 import ij.ImagePlus;
@@ -126,6 +125,13 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static int height, width, nbSlices, type ;
   
     public static void main(final String... args) throws Exception {
+        Properties properties = new Properties();
+        try (InputStream inputStream = GaussFiltering.class.getClassLoader().getResourceAsStream("application.properties")) {
+            properties.load(inputStream);
+        } catch (IOException e) {
+            // handle exception
+        }
+
         // create the ImageJ application context with all available services
         final ImageJ ij = new ImageJ(); 
         
@@ -134,7 +140,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         
         // ask the user for a file to open
 //        final File file = ij.ui().chooseFile(null, "open");
-        final File file = new File("C:/Users/skullriver/Desktop/Sorbonne/S2/pstl/Codes/LowRankSparseNoiseDecomposition-GoDec/Samples/1-Original.tif");
+        String constantValue = properties.getProperty("constant.variable.filename");
+        final File file = new File(constantValue);
         
         // si le fichier choisi est bon
         if (file != null) {
@@ -209,23 +216,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
             CommonOps.transpose(A, ok);
 
-            //old svd
-
-            /*SimpleMatrix U=null,W=null,V=null, check = null;
-            @SuppressWarnings("unchecked")
-			SimpleSVD<SimpleMatrix> svd = ok.svd(true); // compacte pour aller plus vite ...
-
-            U=svd.getU();
-            W=svd.getW();
-            V=svd.getV();
-
-            SimpleMatrix X = svd.getU().extractMatrix(0, U.numRows(), 0, k); // CMMT
-            SimpleMatrix invX = new SimpleMatrix(X.numRows(), X.numCols());
-            for (int e=X.numCols()-1, i=0; i<X.numCols(); i++, e--) {
-            	for (int j=0; j<X.numRows(); j++) {
-            		invX.set(j, e, X.get(j, i));
-            	}
-            }*/
 
             org.ejml.factory.SingularValueDecomposition<DenseMatrix64F> svd = DecompositionFactory.svd(ok.numRows, k, true, true, true);
 
