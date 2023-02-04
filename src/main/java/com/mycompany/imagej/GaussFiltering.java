@@ -133,7 +133,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         
         // ask the user for a file to open
 //        final File file = ij.ui().chooseFile(null, "open");
-        final File file = new File("/home/s-daniiel/Desktop/1-Original.tif");
+        final File file = new File("C:/Users/skullriver/Desktop/Sorbonne/S2/pstl/Codes/LowRankSparseNoiseDecomposition-GoDec/Samples/1-Original.tif");
         
         // si le fichier choisi est bon
         if (file != null) {
@@ -144,7 +144,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         	ImagePlus imp = IJ.openImage(file.getPath());  // image
         	ImageProcessor ip = imp.getProcessor();
         	int autotr = ip.getAutoThreshold();
-        	System.out.println("++++++++++++++++++++> ip: "+autotr);
+
         	int stackSize = imp.getStackSize();	// nombre de frames
             int ImgHeight = imp.getHeight();	// hauteur
             int ImgWidth = imp.getWidth();	// largeur
@@ -166,10 +166,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             
             height = ImgHeight;
             width = ImgWidth;
-            
-            System.out.println(stackSize);
-            System.out.println(ImgHeight);
-            System.out.println(ImgWidth);
         	
         	String [] choice = {" soft "," hard "};
         	GenericDialog d = new GenericDialog(" Threshold ") ;
@@ -187,396 +183,272 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         		IJ.error(" Invalid parameters ") ;
         		return ;
         	}
-        	
-        	System.out.println(tau);
-            System.out.println(mode);
             
             double[][][] matrix = constructMatrix(imp.getStack(), type) ;
-            System.out.println("======================");
-            System.out.println(matrix.length);
-            System.out.println(matrix[0].length);
-            System.out.println(matrix[0][0].length);
-            System.out.println("======================"+height);
             
             /*
              * SVD 
              */
-//            int nb = 0; // 12h30
-//            SimpleMatrix ok = new SimpleMatrix(nbSlices, height*width);
-//            for (int i=0; i<nbSlices; i++) {
-//            	for (int j=0; j<width; j++) {
-//            		for (int e=0; e<height; e++) {
-//            			ok.set(i, nb, matrix[i][j][e]);
-//            			nb++;
-//            		}
-//            	}
-//            	nb = 0;
-//            }
             
             int nb = 0; // 12h30
-            SimpleMatrix ok = new SimpleMatrix(nbSlices, height*width);
+            DenseMatrix64F A = new DenseMatrix64F(nbSlices, height*width);
             for (int i=0; i<nbSlices; i++) {
             	for (int j=0; j<height; j++) {
             		for (int e=0; e<width; e++) {
-            			ok.set(i, nb, matrix[i][e][j]);
+            			A.set(i, nb, matrix[i][e][j]);
             			nb++;
             		}
             	}
             	nb = 0;
             }
-            
-            ok.printDimensions();
-            ok = ok.transpose();
-            ok.printDimensions();
-            ok.saveToFileCSV("OK.csv"); 
-            System.out.println("=======ICI");
-            
-            for (int i=0; i<ok.numCols(); i++) {
-            	if (i%25==0) {
-            		System.out.println();
-            	}
-            	System.out.print(ok.get(99, i)+" ");
-            }
-            System.out.println();
-            
- 
-         
-//            SimpleMatrix A = new SimpleMatrix(matrix[0]);
 
-            
-            
-            System.out.println("++++++++++++++++++++++++");
-            SimpleMatrix U=null,W=null,V=null, check = null;
+//            ok = ok.transpose();
+
+            DenseMatrix64F ok = new DenseMatrix64F(A.numCols, A.numRows);
+
+            CommonOps.transpose(A, ok);
+
+            //old svd
+
+            /*SimpleMatrix U=null,W=null,V=null, check = null;
             @SuppressWarnings("unchecked")
 			SimpleSVD<SimpleMatrix> svd = ok.svd(true); // compacte pour aller plus vite ...
-            
-//			double [] Svd = null;
-//            Svd = svd.getSVD().getSingularValues();
-            System.out.println("======================");
+
             U=svd.getU();
-            System.out.println(U.getNumElements());
-            System.out.println("======================");
             W=svd.getW();
-            System.out.println(W.getNumElements());
-            System.out.println("======================");
-            V=svd.getV(); 
-            System.out.println(W.getNumElements());
-            System.out.println("======================");
-            
+            V=svd.getV();
+
             SimpleMatrix X = svd.getU().extractMatrix(0, U.numRows(), 0, k); // CMMT
-            System.out.println("X: "+X.getNumElements()+" ("+X.numRows()+", "+X.numCols()+")");
-//            X.print();
-//            X.saveToFileCSV("X.csv");
             SimpleMatrix invX = new SimpleMatrix(X.numRows(), X.numCols());
             for (int e=X.numCols()-1, i=0; i<X.numCols(); i++, e--) {
             	for (int j=0; j<X.numRows(); j++) {
             		invX.set(j, e, X.get(j, i));
             	}
+            }*/
+
+            org.ejml.factory.SingularValueDecomposition<DenseMatrix64F> svd = DecompositionFactory.svd(ok.numRows, k, true, true, true);
+
+            svd.decompose(ok);
+            DenseMatrix64F U = svd.getU(null, false);
+            DenseMatrix64F W = svd.getW(null);
+            DenseMatrix64F V = svd.getV(null, false);
+
+            DenseMatrix64F X = new DenseMatrix64F(U.numRows, k);
+            CommonOps.extract(U, 0, U.numRows, 0, k, X, 0, 0);
+
+            DenseMatrix64F invX = new DenseMatrix64F(X.numRows, X.numCols);
+            for (int e=X.numCols-1, i=0; i<X.numCols; i++, e--) {
+                for (int j=0; j<X.numRows; j++) {
+                    invX.set(j, e, X.get(j, i));
+                }
             }
-            
-            // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un - 
+
+            // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
             SimpleMatrix negatif = SimpleMatrix.diag(1, -1);
-            invX = invX.mult(negatif);
-            invX.saveToFileCSV("invX.csv");
-            
-            
-            System.out.println("-------------------------");
-            SimpleMatrix Y = svd.getV().extractMatrix(0, k, 0, V.numCols()); // CMMT
-            SimpleMatrix Ytest = svd.getV().extractMatrix(0, V.numCols(), 0, k); // CMMT
-//            Ytest = Ytest.scale(-1);
-            SimpleMatrix invY = new SimpleMatrix(Ytest.numRows(), Ytest.numCols());
-            for (int e=Ytest.numCols()-1, i=0; i<Ytest.numCols(); i++, e--) {
-            	for (int j=0; j<Ytest.numRows(); j++) {
-            		invY.set(j, e, Ytest.get(j, i));
-            	}
-            }
-//            SimpleMatrix negatif2 = SimpleMatrix.diag(1, 1);
-            invY = invY.mult(negatif);
-            
-            invY = invY.transpose();  
-            
-            invY.saveToFileCSV("Ytest.csv");
-            System.out.println("Y: "+Y.getNumElements()+" ("+Y.numRows()+", "+Y.numCols()+")");
-//            Y.transpose(); // pour l'affichage csv
-//            Y.saveToFileCSV("Y.csv");
-//            Y.transpose(); // remise comme avant
-            
-//            SimpleMatrix invY = new SimpleMatrix(Y.numRows(), Y.numCols());
-//            for (int e=Y.numCols()-1, i=0; i<Y.numCols(); i++, e--) {
-//            	for (int j=0; j<Y.numRows(); j++) {
-//            		invX.set(j, e, Y.get(j, i));
-//            	}
-//            }
-            
-//            // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un - 
-//            SimpleMatrix negatif2 = SimpleMatrix.diag(1, -1);
 //            invX = invX.mult(negatif);
-//            invX.saveToFileCSV("invX.csv");
-            
-            System.out.println("-------------------------");
-            SimpleMatrix s = svd.getW().extractMatrix(0, k, 0, k);
-            System.out.println("s: "+s.getNumElements());
-            SimpleMatrix ss = s.extractDiag(); 
-            ss.print();
-            double[] valS = new double[ss.numRows()];
-            for (int j=0, i=ss.numRows()-1; i>=0; i--, j++) {
-            	System.out.println(i);
-            	valS[j] = ss.get(i, 0);
-            }
-//            System.out.println(valS[0]+" "+valS[1]);
-            SimpleMatrix ssi = SimpleMatrix.diag(valS);
-            ssi.print();
-//            ssi.saveToFileCSV("S.csv");
-            System.out.println("-------------------------");
-//            SimpleMatrix vectX1 = X.extractVector(false, 0);
-//            vectX1.print();
-            
-//      
-           
-         
-//            
-            X = invX.mult(ssi); 
-            X.saveToFileCSV("X.csv");
-            
-            System.out.println("X: "+X.getNumElements());
-            
-            
-//            SimpleMatrix invY = new SimpleMatrix(Y.numRows(), Y.numCols());
-//            for (int e=Y.numCols()-1, i=0; i<Y.numCols(); i++, e--) {
-//            	for (int j=0; j<Y.numRows(); j++) {
-//            		invY.set(j, e, Y.get(j, i));
+//
+//            SimpleMatrix Y = svd.getV().extractMatrix(0, k, 0, V.numCols()); // CMMT
+//            SimpleMatrix Ytest = svd.getV().extractMatrix(0, V.numCols(), 0, k); // CMMT
+//            SimpleMatrix invY = new SimpleMatrix(Ytest.numRows(), Ytest.numCols());
+//            for (int e=Ytest.numCols()-1, i=0; i<Ytest.numCols(); i++, e--) {
+//            	for (int j=0; j<Ytest.numRows(); j++) {
+//            		invY.set(j, e, Ytest.get(j, i));
 //            	}
 //            }
-//            
-//            double[] valNeg = new double[100];
-//            for (int i=0; i<100; i++) {
-//            	valNeg[i] = -1;
+//
+//            invY = invY.mult(negatif);
+//
+//            invY = invY.transpose();
+//
+//            SimpleMatrix s = svd.getW().extractMatrix(0, k, 0, k);
+//            SimpleMatrix ss = s.extractDiag();
+//
+//            double[] valS = new double[ss.numRows()];
+//            for (int j=0, i=ss.numRows()-1; i>=0; i--, j++) {
+//            	valS[j] = ss.get(i, 0);
 //            }
-//            
-//            SimpleMatrix negatif2 = SimpleMatrix.diag(valNeg);
-//            
-//            Y = invY.mult(negatif2);
-//            (Y.transpose()).saveToFileCSV("Y.csv");
-            Y = invY;
-            SimpleMatrix L = X.mult(Y);
-            L.saveToFileCSV("L.csv");
-            System.out.println("L: "+L.getNumElements()+" ("+L.numRows()+", "+L.numCols()+")");
-            System.out.println("-------------------------");
-
-            System.out.println("L: "+L.getNumElements());
-            SimpleMatrix S = ok.minus(L);
-            	
-            
-            //thresholding
-//            S = thresholding(S);  
-            S = threshold(S, tau, "soft");
-//            S.saveToFileCSV("S.csv");
-            System.out.println("+++++++++++++++++++++++++++++++++++++");
-            
-            double result = (double) rank / k;
-            int rankk = (int) Math.round(result);
-            SimpleMatrix error = new SimpleMatrix(rank * power, 1);
-            SimpleMatrix T = (ok.minus(L)).minus(S);
-            double normD = ok.normF();
-            double normT = T.normF();
-            
-            error.set(0, (double) normT / normD);
-            error.print();
-            
-            int iii = 1;
-            boolean stop = false;
-            double alf = 0;
-            
-            for(int i=1; i<rankk+1; i++) {
-            	System.out.println(i);
-            	i = i-1;
-            	int rrank = rank;
-            	int est_rank = 1;
-            	alf = 0;
-            	double increment = 1;
-
-            	if (iii == power * (i - 2) + 1) {
-            		iii = iii + power;
-            	}
-            	
-            	for(int j=1; j<power+1; j++) {
-            		
-            		//update X 
-            		X = (L.mult(Y.transpose()));
-            		for (int k=0; k<X.numCols(); k++) {
-            			for (int l=0; l<X.numRows(); l++) {
-            				X.set(l, k, Math.abs(X.get(l, k)));
-            			}
-            		}
-            		
-            		 if (j==2 && i==1) {
-                     	X.saveToFileCSV("Y.csv");
-                 		System.out.println("mataaa");
-                 		System.out.println("222");
-                     }
-            		 		
-            		
-            		DenseMatrix64F X2 = X.getMatrix();
-            		
-            		// Do a QR decomposition 
-            		/* Possible qu'ici la decomposition se fasse mal */
-                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
-                    qr.decompose(X2);
-                    X = SimpleMatrix.wrap(qr.getQ(null, true));
-                    
-                   
-            		
-                    // Update of Y
-                    Y = (X.transpose()).mult(L);
-                    L = X.mult(Y);
-                    
-                    // Update of S
-                    T = ok.minus(L);
-                    //thresholding
-//                    S = thresholding(T);
-                    S = threshold(T, tau, "soft");
-                    
-                    
-                    // Error, stopping criteria
-                    T = T.minus(S);
-                    int ii = iii + j - 1;
-                    
-                    normT = T.normF();
-                    
-                    error.set(ii, (double) normT / normD);
-                    
-                    if (error.get(ii) < tol) {
-                    	stop = true;
-                    	System.out.println("STOPPPPPPPPPP");
-                    	break;
-                    }
-                        
-                    if (rrank != rank) {
-                    	System.out.println("AICI BA");
-                    	rank = rrank;
-                    	if(est_rank == 0) {
-                    		alf = 0;
-                    		continue;
-                    	}
-                    }
-                    
-                    // Adjust alf
-                    double ratio = (double) error.get(ii) / error.get(ii-1);
-                    
-                    // Intermediate variables
-                    SimpleMatrix X1 = X;
-                    SimpleMatrix Y1 = Y;
-                    SimpleMatrix L1 = L;
-					SimpleMatrix S1 = S;
-                    SimpleMatrix T1 = T;
-                    
-                    
-                    if (ratio >= 1.1) {
-//                    	System.out.println("1er");
-                    	increment = Math.max(0.1 * alf, 0.1 * increment);
-                    	X = X1;
-                        Y = Y1;
-                        L = L1;
-                        S = S1;
-                        T = T1;
-                        error.set(ii, error.get(ii-1));
-                        alf = 0;
-                    }else if (ratio > 0.7) {
-//                    	System.out.println("2eme");
-                    	increment = Math.max(increment, 0.25 * alf);
-                        alf = alf + increment;
-                    }
-                    
-                    // Update of L
-                    X1 = X;
-                    Y1 = Y;
-                    L1 = L;
-                    S1 = S;
-                    T1 = T;
-                    L = L.plus(T.scale(1+alf));
-                    
-                    // Add corest AR
-                    if (j > 8) {
-                    	System.out.println("PULA");
-                        double mean = mean(error, ii - 7, ii);
-                        if (mean > 0.92) {
-                            iii = ii;
-                            int YRow = Y.numRows();
-                            int XRow = X.numRows();
-                            if ((YRow - XRow) >= k) {
-                                Y = Y.extractMatrix(0, XRow - 1, 0, Y.numCols());
-                            }
-                            break;
-                        }
-                    }
-                    
-                    
-            	}
-            	
-            	if( stop == true) {
-            		break;
-            	}
-            	
-//            	AR
-            	if (i + 1 < rankk) {
-            		Random r = new Random();
-            	    SimpleMatrix RR = new SimpleMatrix(k, ok.numRows());
-            	    for (int x=0; x<k; x++) {
-            	    	for (int z=0; z<ok.numRows(); z++) {
-//            	    		RR.set(x, z, r.nextGaussian());
-            	    		RR.set(x, z, 1.0);
-            	    	}
-            	    }
-            	    
-            	    SimpleMatrix v = RR.mult(L);
-            	    Y = Y.combine(2, 0, v); 
-            	}
-//            	Y.saveToFileCSV("Y.csv");
-//        		System.out.println("mataaa");
-//        		System.out.println("222");
-            		
-            	i++;
-            	
-            }
-            L = X.mult(Y);
-            
-            
-            System.out.println(L.numRows()+" "+L.numCols());
-            if (ok.numRows() > ok.numCols()){
-            	L = L.transpose();
-            	S = S.transpose();
-            	ok = ok.transpose();
-            }
-            System.out.println(L.numRows()+" "+L.numCols());
-//            S.saveToFileCSV("S.csv");
-//           S.saveToFileCSV("S.csv");
-            
-            double[][] A2 = matrix2Array2(ok);
-            double[][] L2 = matrix2Array2(L);
-            double[][] S2 = matrix2Array2(S);
-            SimpleMatrix noir = new SimpleMatrix(L.numRows(), L.numCols());
-            noir.zero();
-            noir.set(153.0);
-            
-            double [][] noir2 = matrix2Array2(noir);
-            
-            
-            
-        	
-            ImagePlus original = new ImagePlus (" Original Image ", constructImageStack2 (
-            		A2, type) ) ;
-            ImagePlus im = new ImagePlus (" Background Image ", constructImageStack2 (
-            		L2, type) ) ;
-            ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack2 (
-            		S2, type) ) ;
-            
-            ImagePlus imnoir = new ImagePlus (" Sparse Image ", constructImageStack2 (
-            		noir2, type) ) ;
-            
-            im.show();
-            im2.show();
-            original.show();
-            imnoir.show();
+//
+//            SimpleMatrix ssi = SimpleMatrix.diag(valS);
+//
+//            X = invX.mult(ssi);
+//
+//            Y = invY;
+//            SimpleMatrix L = X.mult(Y);
+//
+//            SimpleMatrix S = ok.minus(L);
+//
+//            S = threshold(S, tau, "soft");
+//
+//            double result = (double) rank / k;
+//            int rankk = (int) Math.round(result);
+//            SimpleMatrix error = new SimpleMatrix(rank * power, 1);
+//            SimpleMatrix T = (ok.minus(L)).minus(S);
+//            double normD = ok.normF();
+//            double normT = T.normF();
+//
+//            error.set(0, (double) normT / normD);
+//
+//            int iii = 1;
+//            boolean stop = false;
+//            double alf = 0;
+//
+//            for(int i=1; i<rankk+1; i++) {
+//            	i = i-1;
+//            	int rrank = rank;
+//            	int est_rank = 1;
+//            	alf = 0;
+//            	double increment = 1;
+//
+//            	if (iii == power * (i - 2) + 1) {
+//            		iii = iii + power;
+//            	}
+//
+//            	for(int j=1; j<power+1; j++) {
+//
+//            		//update X
+//            		X = (L.mult(Y.transpose()));
+//            		for (int k=0; k<X.numCols(); k++) {
+//            			for (int l=0; l<X.numRows(); l++) {
+//            				X.set(l, k, Math.abs(X.get(l, k)));
+//            			}
+//            		}
+//
+//                    DenseMatrix64F X2 = X.getMatrix();
+//
+//            		// Do a QR decomposition
+//            		/* Possible qu'ici la decomposition se fasse mal */
+//
+//                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
+//                    qr.decompose(X2);
+//                    X = SimpleMatrix.wrap(qr.getQ(null, true));
+//
+//                    if (j==1 && i==1) {
+//                        X.saveToFileCSV("Y.csv");
+//                    }
+//
+//
+//                    // Update of Y
+//                    Y = (X.transpose()).mult(L);
+//                    L = X.mult(Y);
+//
+//                    // Update of S
+//                    T = ok.minus(L);
+//                    //thresholding
+//                    S = threshold(T, tau, "soft");
+//
+//
+//                    // Error, stopping criteria
+//                    T = T.minus(S);
+//                    int ii = iii + j - 1;
+//
+//                    normT = T.normF();
+//
+//                    error.set(ii, (double) normT / normD);
+//
+//                    if (error.get(ii) < tol) {
+//                    	stop = true;
+//                    	System.out.println("STOPPPPPPPPPP");
+//                    	break;
+//                    }
+//
+//                    if (rrank != rank) {
+//                    	System.out.println("AICI BA");
+//                    	rank = rrank;
+//                    }
+//
+//                    // Adjust alf
+//                    double ratio = (double) error.get(ii) / error.get(ii-1);
+//
+//                    // Intermediate variables
+//                    SimpleMatrix X1 = X;
+//                    SimpleMatrix Y1 = Y;
+//                    SimpleMatrix L1 = L;
+//					SimpleMatrix S1 = S;
+//                    SimpleMatrix T1 = T;
+//
+//
+//                    if (ratio >= 1.1) {
+////                    	System.out.println("1er");
+//                    	increment = Math.max(0.1 * alf, 0.1 * increment);
+//                        error.set(ii, error.get(ii-1));
+//                        alf = 0;
+//                    }else if (ratio > 0.7) {
+////                    	System.out.println("2eme");
+//                    	increment = Math.max(increment, 0.25 * alf);
+//                        alf = alf + increment;
+//                    }
+//
+//                    // Update of L
+//                    L = L.plus(T.scale(1+alf));
+//
+//                    // Add corest AR
+//                    if (j > 8) {
+//                    	System.out.println("PULA");
+//                        double mean = mean(error, ii - 7, ii);
+//                        if (mean > 0.92) {
+//                            iii = ii;
+//                            int YRow = Y.numRows();
+//                            int XRow = X.numRows();
+//                            if ((YRow - XRow) >= k) {
+//                                Y = Y.extractMatrix(0, XRow - 1, 0, Y.numCols());
+//                            }
+//                            break;
+//                        }
+//                    }
+//
+//
+//            	}
+//
+//            	if(stop) {
+//            		break;
+//            	}
+//
+////            	AR
+//            	if (i + 1 < rankk) {
+//            		Random r = new Random();
+//            	    SimpleMatrix RR = new SimpleMatrix(k, ok.numRows());
+//            	    for (int x=0; x<k; x++) {
+//            	    	for (int z=0; z<ok.numRows(); z++) {
+////            	    		RR.set(x, z, r.nextGaussian());
+//            	    		RR.set(x, z, 1.0);
+//            	    	}
+//            	    }
+//
+//            	    SimpleMatrix v = RR.mult(L);
+//            	    Y = Y.combine(2, 0, v);
+//            	}
+//
+//            	i++;
+//
+//            }
+//            L = X.mult(Y);
+//
+//
+//            System.out.println(L.numRows()+" "+L.numCols());
+//            if (ok.numRows() > ok.numCols()){
+//            	L = L.transpose();
+//                assert S != null;
+//                S = S.transpose();
+//            	ok = ok.transpose();
+//            }
+//
+//            double[][] A2 = matrix2Array2(ok);
+//            double[][] L2 = matrix2Array2(L);
+//            assert S != null;
+//            double[][] S2 = matrix2Array2(S);
+//
+//
+//            ImagePlus original = new ImagePlus (" Original Image ", constructImageStack2 (
+//            		A2, type) ) ;
+//            ImagePlus im = new ImagePlus (" Background Image ", constructImageStack2 (
+//            		L2, type) ) ;
+//            ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack2 (
+//            		S2, type) ) ;
+//
+//
+//            im.show();
+//            im2.show();
+//            original.show();
             
             /*
              * Maybe will be useful
