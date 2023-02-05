@@ -7,8 +7,20 @@
  */
 
 package com.mycompany.imagej;
+//
+//import java.util.Locale;
+//
+//import org.apache.commons.math3.linear.Array2DRowRealMatrix;
+//import org.apache.commons.math3.linear.QRDecomposition;
+//import org.apache.commons.math3.linear.RealMatrix;
+
+import org.la4j.Matrix;
+import org.la4j.decomposition.QRDecompositor;
+
 
 import net.imagej.Dataset;
+//import cern.colt.matrix.impl.DenseDoubleMatrix2D;
+//import cern.colt.matrix.linalg.QRDecomposition;
 import net.imagej.ImageJ;
 import net.imagej.ops.OpService;
 import net.imglib2.RandomAccessibleInterval;
@@ -20,7 +32,7 @@ import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 import org.scijava.ui.UIService;
 
-import Jama.Matrix;
+//import Jama.Matrix;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -36,10 +48,12 @@ import ij.gui.GenericDialog;
 import ij.gui.StackWindow;
 import ij.io.Opener;
 import ij.process.ByteProcessor;
+import ij.process.FloatProcessor;
 import ij.process.ImageConverter;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 
+import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.ejml.alg.dense.decomposition.qr.QRDecompositionHouseholderColumn;
 import org.ejml.data.DMatrixRMaj;
 import org.ejml.data.DMatrixSparse;
@@ -53,10 +67,12 @@ import org.ejml.factory.DecompositionInterface;
 import org.ejml.factory.LinearSolver;
 import org.ejml.factory.LinearSolverFactory;
 import org.ejml.factory.QRDecomposition;
+//import org.ejml.factory.QRDecomposition;
 import org.ejml.interfaces.decomposition.SingularValueDecomposition;
 import org.ejml.interfaces.decomposition.SingularValueDecomposition_F64;
 import org.ejml.ops.CommonOps;
 import org.ejml.ops.SingularOps;
+import org.ejml.simple.SimpleBase;
 import org.ejml.simple.SimpleMatrix;
 import org.ejml.simple.SimpleSVD;
 
@@ -122,7 +138,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static int power = 5;
     private static MODE mode = MODE . SOFT ;
     private enum MODE { SOFT , HARD ; }
-    private static int height, width, nbSlices, type ;
+    private static int height, width, nbSlices, type, dynamicRange = 8;
   
     public static void main(final String... args) throws Exception {
         // create the ImageJ application context with all available services
@@ -132,8 +148,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         ij.ui().showUI();
         
         // ask the user for a file to open
-//        final File file = ij.ui().chooseFile(null, "open");
-        final File file = new File("/home/s-daniiel/Desktop/1-Original.tif");
+        final File file = ij.ui().chooseFile(null, "open");
+//        final File file = new File("/home/s-daniiel/Desktop/1-Original.tif");
         
         // si le fichier choisi est bon
         if (file != null) {
@@ -142,12 +158,14 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         	
         	// recuperation des donnees
         	ImagePlus imp = IJ.openImage(file.getPath());  // image
-        	ImageProcessor ip = imp.getProcessor();
+           	ImageProcessor ip = imp.getProcessor();
         	int autotr = ip.getAutoThreshold();
         	System.out.println("++++++++++++++++++++> ip: "+autotr);
         	int stackSize = imp.getStackSize();	// nombre de frames
             int ImgHeight = imp.getHeight();	// hauteur
             int ImgWidth = imp.getWidth();	// largeur
+            
+            System.out.println("------>"+imp.getType());
                     
             // FIXME probleme s'il y a qu'une seule frame ?
             if ( imp.getStackSize() < 2) {
@@ -155,14 +173,22 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             	return;
             } else { // si plusieurs frames
             	nbSlices = stackSize; 
-            	if( imp.getType() == ImagePlus.GRAY8 ) type = 8;
+            	if( imp.getType() == ImagePlus.GRAY8 ) {
+            		type = 8;
+            		System.out.println("===> 8 bits");
+            	}
             	else 
-            		if( imp.getType () == ImagePlus.GRAY16 ) type = 16;
+            		if( imp.getType () == ImagePlus.GRAY16 ) {
+            			type = 16;
+            			System.out.println("===> 16 bits");
+            		}
             		else {
             			IJ.error (" Image type not supported ( only GRAY8 and GRAY16 )") ;
             			return ;
             		}
             }
+            
+            System.out.println("------>"+type);
             
             height = ImgHeight;
             width = ImgWidth;
@@ -190,7 +216,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         	
         	System.out.println(tau);
             System.out.println(mode);
-            
+
             double[][][] matrix = constructMatrix(imp.getStack(), type) ;
             System.out.println("======================");
             System.out.println(matrix.length);
@@ -242,6 +268,15 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
  
          
 //            SimpleMatrix A = new SimpleMatrix(matrix[0]);
+            
+//            double[][] testt = {{1,3,2,0}, {0,-1,-1, 0}, {2, 2, 1, 1}, 
+//            					 {-1, 1, 3, 4}, {-4, 0, 1, -2}, {0, -1, -2, 5}};
+//            
+//            SimpleMatrix TESTT = new SimpleMatrix(testt);
+//            SimpleMatrix QTEST = QRFactorisation_Q(TESTT);
+//            QTEST.print();
+           
+            
 
             
             
@@ -336,7 +371,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
          
 //            
             X = invX.mult(ssi); 
-            X.saveToFileCSV("X.csv");
+//            X.saveToFileCSV("X.csv");
             
             System.out.println("X: "+X.getNumElements());
             
@@ -359,7 +394,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //            (Y.transpose()).saveToFileCSV("Y.csv");
             Y = invY;
             SimpleMatrix L = X.mult(Y);
-            L.saveToFileCSV("L.csv");
+//            L.saveToFileCSV("L.csv");
             System.out.println("L: "+L.getNumElements()+" ("+L.numRows()+", "+L.numCols()+")");
             System.out.println("-------------------------");
 
@@ -409,21 +444,59 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             			}
             		}
             		
-            		 if (j==2 && i==1) {
-                     	X.saveToFileCSV("Y.csv");
-                 		System.out.println("mataaa");
-                 		System.out.println("222");
-                     }
-            		 		
             		
-            		DenseMatrix64F X2 = X.getMatrix();
+//            		DenseMatrix64F X2 = X.getMatrix();
             		
             		// Do a QR decomposition 
             		/* Possible qu'ici la decomposition se fasse mal */
-                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
-                    qr.decompose(X2);
-                    X = SimpleMatrix.wrap(qr.getQ(null, true));
+//                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
+//                    qr.decompose(X2);
+//                    if (j==1 && i==1) System.out.println(qr.getQ(null, true).get(0, 3));
+//                    SimpleMatrix Q = SimpleMatrix.wrap(qr.getQ(null, true));
+//                    X = Q;
+            		
+//            		QRDecompositionHouseholderColumn qr = new QRDecompositionHouseholderColumn();
+//                    qr.decompose(X2);
+//                    X2 = qr.getQ(null, true);
+//                    System.out.println(X2.numRows+" "+X2.numCols);
+//                    
+//                    X = SimpleMatrix.wrap(X2);
+//                    
+            		X = QRFactorisation_Q(X, j);
+//                    if (j==5 && i==1) {
+//                    	X.saveToFileCSV("Y.csv");
+//                 		System.out.println("mataaa");
+//                 		System.out.println("222");
+//                     }
+//                    
                     
+                    
+//            		double[][] test = new double[X.numRows()][X.numCols()];
+//            		for (int i1=0; i1<X.numRows(); i1++) {
+//            			for (int i2=0; i2<X.numCols(); i2++) {
+//            				test[i1][i2] = X.get(i1, i2);
+//            			}
+//            		}
+//            		
+//            		Matrix mat = Matrix.from2DArray(test);
+//            		
+//            		Matrix[] qr = new QRDecompositor(mat).decompose();
+//            		Matrix xx = qr[0].multiply(qr[1]);
+//            		Matrix xxx = qr[0]; 
+//            		SimpleMatrix QR = new SimpleMatrix(X.numRows(), X.numRows());
+////            		SimpleMatrix Q = new SimpleMatrix(X.numRows(), X.numRows());
+//            		for (int i1=0; i1<xx.rows(); i1++) {
+//            			for (int i2=0; i2<xx.columns(); i2++) {
+//            				QR.set(i1, i2, xx.get(i1, i2)); //QR
+////            				Q.set(i1, i2, xxx.get(i1, i2)); // Q
+//            			}
+//            		}
+            		
+                    
+                    
+                    
+                    
+                   
                    
             		
                     // Update of Y
@@ -509,7 +582,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                             break;
                         }
                     }
-                    
+
                     
             	}
             	
@@ -531,7 +604,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             	    SimpleMatrix v = RR.mult(L);
             	    Y = Y.combine(2, 0, v); 
             	}
-//            	Y.saveToFileCSV("Y.csv");
+//            	L.saveToFileCSV("Y.csv");
 //        		System.out.println("mataaa");
 //        		System.out.println("222");
             		
@@ -542,41 +615,34 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             
             
             System.out.println(L.numRows()+" "+L.numCols());
-            if (ok.numRows() > ok.numCols()){
+            if (ok.numRows() > ok.numCols()) {
+            	System.out.println("TRANS");
             	L = L.transpose();
             	S = S.transpose();
             	ok = ok.transpose();
             }
             System.out.println(L.numRows()+" "+L.numCols());
-//            S.saveToFileCSV("S.csv");
 //           S.saveToFileCSV("S.csv");
+            
+//            S = SimpleMatrix.loadCSV("matrice_OK.csv");
+            
+            
             
             double[][] A2 = matrix2Array2(ok);
             double[][] L2 = matrix2Array2(L);
             double[][] S2 = matrix2Array2(S);
-            SimpleMatrix noir = new SimpleMatrix(L.numRows(), L.numCols());
-            noir.zero();
-            noir.set(153.0);
             
-            double [][] noir2 = matrix2Array2(noir);
-            
-            
-            
-        	
             ImagePlus original = new ImagePlus (" Original Image ", constructImageStack2 (
             		A2, type) ) ;
             ImagePlus im = new ImagePlus (" Background Image ", constructImageStack2 (
             		L2, type) ) ;
             ImagePlus im2 = new ImagePlus (" Sparse Image ", constructImageStack2 (
-            		S2, type) ) ;
+    		S2, type) ) ;
             
-            ImagePlus imnoir = new ImagePlus (" Sparse Image ", constructImageStack2 (
-            		noir2, type) ) ;
             
             im.show();
             im2.show();
             original.show();
-            imnoir.show();
             
             /*
              * Maybe will be useful
@@ -643,13 +709,14 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     	}
     	if( bit == 16) {
     		for (int z = 0; z < nbSlices ; z ++) {
-    			ShortProcessor bp = ( ShortProcessor ) stack.getProcessor (z+1) ;
+    			ShortProcessor bp =  (ShortProcessor) stack.getProcessor (z+1) ;
     			for (int i = 0; i < width ; i ++)
     				for (int j =0; j < height ; j ++)
     					matrix[z][i][j] = bp.getPixelValue (i, j) ;
     	
     		}
     	}
+    	
     	return matrix ;
     }
 /*-----------------------------------------------------------------------------------------------------------------------*/
@@ -667,16 +734,62 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     	return newStack;
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ImageStack constructImageStack2 ( double [][] matrix , int bit ) {    	
+    private static ImageStack constructImageStack2 ( double [][] matrix , int bit ) {    
+    	double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+
+        // trouver la valeur minimale et la valeur maximale
+        for (int i = 0; i < matrix.length; i++) {
+            for (int j = 0; j < matrix[i].length; j++) {
+                min = Math.min(min, matrix[i][j]);
+                max = Math.max(max, matrix[i][j]);
+            }
+        }
+        
+        // normaliser les données
+        for (int i = 0; i < matrix.length; i++) {
+            for (int j = 0; j < matrix[i].length; j++) {
+            	matrix[i][j] = ((matrix[i][j] - min) / (max - min)) * (Math.pow(2, dynamicRange) - 1);
+            }
+        }
+    	
+    	ImageStack newStack = new ImageStack (width, height) ;
+        for (int z = 0; z < nbSlices ; z ++) {
+        	byte[] pixels = new byte[width*height];
+        	if (dynamicRange == 8) {
+        		for (int i = 0; i < pixels.length; i++) {
+            	    pixels[i] = (byte) Math.round(matrix[z][i]);
+            	}
+        		ByteProcessor bp = new ByteProcessor(width, height, pixels);
+                
+                newStack.addSlice(bp);
+        	}
+//          } else if (dynamicRange == 16) {
+//          short[][] shortData = new short[S2.length][S2[0].length];
+//          for (int i = 0; i < S2.length; i++) {
+//              for (int j = 0; j < S2[i].length; j++) {
+//                  shortData[i][j] = (short) Math.round(S2[i][j]);
+//              }
+//          }
+//          S2 = shortData;
+        	else {
+        		System.out.println("The dynamic range should be equal to 8 or 16 (bits)");
+        	}
+        }
+    	
+    	return newStack;
+    }
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    private static ImageStack constructImageStack3 ( double [][] matrix , int bit ) {    	
     	ImageStack newStack = new ImageStack (width, height) ;
         for (int z = 0; z < nbSlices ; z ++) {
         	byte[] pixels = new byte[width*height];
         	for (int i = 0; i < pixels.length; i++) {
-        	    pixels[i] = (byte) matrix[z][i];
-        	}
+                    pixels[i] = (byte)(matrix[z][i] + 0.5);
+            }
             ByteProcessor bp = new ByteProcessor(width, height, pixels);
                     
-            newStack.addSlice(bp);
+            newStack.addSlice("slice " + (z+1), bp);
         }
     	
     	return newStack;
@@ -779,5 +892,45 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 	        }
 	        return array;
 	    }
+	 
+	 
+	 private static SimpleMatrix QRFactorisation_Q(SimpleMatrix matrix, int negatif) {
+		 if (matrix.numRows() < matrix.numCols()) {
+			 System.out.println("Il doit y avoir plus de lignes que de colonnes");
+			 return null;
+		 }
+		 
+		 boolean multiplier = false;
+		 if (negatif <= 2) {
+			 multiplier = true;
+		 }
+		 
+		 SimpleMatrix Q = new SimpleMatrix(matrix.numRows(), matrix.numCols());
+		 Q.zero();
+
+		 SimpleMatrix W, Wbis, Qbis, aux;
+		 for (int i=0; i<Q.numCols(); i++) {
+			 W = matrix.extractVector(false, i);
+			 Wbis = W;
+			 for (int j=0; j<i; j++) {
+				 Qbis = Q.extractVector(false, j);
+				 W = W.minus(Qbis.scale(Wbis.dot(Qbis)));
+			 }
+			 aux = W.divide(W.normF());
+			 double[] res = new double[aux.numRows()];
+			 for (int k=0; k<aux.numRows(); k++) {
+				 if ((multiplier) && (i==Q.numCols()-1)){
+					 res[k] = aux.get(k, 0) * -1;
+					 continue;
+				 }
+				 res[k] = aux.get(k, 0);
+			 }
+			 
+			 Q.setColumn(i, 0, res);
+		 }
+		 
+		 return Q;
+		 
+	 }
 	 	
 }
