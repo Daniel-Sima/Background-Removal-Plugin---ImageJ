@@ -2,5 +2,6 @@
 /.project
 /.settings/
 /target/
+/.idea
 
 /src/main/resources/application.properties
