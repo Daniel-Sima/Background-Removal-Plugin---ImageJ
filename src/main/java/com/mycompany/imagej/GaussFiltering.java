@@ -90,7 +90,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static double tol = 0.001;
     private static int power = 5;
     private static MODE mode = MODE.SOFT;
-    private static int height, width, nbSlices, type;
+    private static int height, width, nbSlices, type, dynamicRange = 8;
     @Parameter
     private Dataset currentData;
     @Parameter
@@ -595,19 +595,50 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ImageStack constructImageStack2(double[][] matrix, int bit) {
-        ImageStack newStack = new ImageStack(width, height);
-        for (int z = 0; z < nbSlices; z++) {
-            byte[] pixels = new byte[width * height];
-            for (int i = 0; i < pixels.length; i++) {
-                pixels[i] = (byte) matrix[z][i];
-            }
-            ByteProcessor bp = new ByteProcessor(width, height, pixels);
+    private static ImageStack constructImageStack2 ( double [][] matrix , int bit ) {
+    	double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
 
-            newStack.addSlice(bp);
+        // trouver la valeur minimale et la valeur maximale
+        for (int i = 0; i < matrix.length; i++) {
+            for (int j = 0; j < matrix[i].length; j++) {
+                min = Math.min(min, matrix[i][j]);
+                max = Math.max(max, matrix[i][j]);
+            }
         }
 
-        return newStack;
+        // normaliser les données
+        for (int i = 0; i < matrix.length; i++) {
+            for (int j = 0; j < matrix[i].length; j++) {
+            	matrix[i][j] = ((matrix[i][j] - min) / (max - min)) * (Math.pow(2, dynamicRange) - 1);
+            }
+        }
+
+    	ImageStack newStack = new ImageStack (width, height) ;
+        for (int z = 0; z < nbSlices ; z ++) {
+        	byte[] pixels = new byte[width*height];
+        	if (dynamicRange == 8) {
+        		for (int i = 0; i < pixels.length; i++) {
+            	    pixels[i] = (byte) Math.round(matrix[z][i]);
+            	}
+        		ByteProcessor bp = new ByteProcessor(width, height, pixels);
+
+                newStack.addSlice(bp);
+        	}
+//          } else if (dynamicRange == 16) {
+//          short[][] shortData = new short[S2.length][S2[0].length];
+//          for (int i = 0; i < S2.length; i++) {
+//              for (int j = 0; j < S2[i].length; j++) {
+//                  shortData[i][j] = (short) Math.round(S2[i][j]);
+//              }
+//          }
+//          S2 = shortData;
+        	else {
+        		System.out.println("The dynamic range should be equal to 8 or 16 (bits)");
+        	}
+        }
+
+    	return newStack;
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
@@ -671,43 +702,83 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return result;
     }
+/*-----------------------------------------------------------------------------------------------------------------------*/
+	private static double mean(SimpleMatrix matrix, int start, int end) {
+	    double sum = 0;
+	    int count = 0;
+	    for (int i = start; i < end; i++) {
+	        for (int j = 0; j < matrix.numCols(); j++) {
+	            sum += matrix.get(i, j);
+	            count++;
+	        }
+	    }
+	    return sum / count;
+	}
 
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double mean(DenseMatrix64F matrix, int start, int end) {
-        double sum = 0;
-        int count = 0;
-        for (int i = start; i < end; i++) {
-            for (int j = 0; j < matrix.numCols; j++) {
-                sum += matrix.get(i, j);
-                count++;
-            }
-        }
-        return sum / count;
-    }
+	 private static double[][][] matrix2Array(SimpleMatrix matrix) {
+	        double[][][] array = new double[nbSlices][width][height];
+	        for (int r = 0; r < matrix.numRows(); r++) {
+	            for (int c = 0; c < matrix.numCols(); c++) {
+	                int row = (c % (width*height)) / height;
+	                int col = (c % (width*height)) % height;
+	                array[r][row][col] = matrix.get(r, c);
+	            }
+	        }
+	        return array;
+	    }
 
-    private static double[][][] matrix2Array(SimpleMatrix matrix) {
-        double[][][] array = new double[nbSlices][width][height];
-        for (int r = 0; r < matrix.numRows(); r++) {
-            for (int c = 0; c < matrix.numCols(); c++) {
-                int row = (c % (width * height)) / height;
-                int col = (c % (width * height)) % height;
-                array[r][row][col] = matrix.get(r, c);
-            }
-        }
-        return array;
-    }
+	 private static double[][][] matrix2Array3(SimpleMatrix matrix) {
+	        double[][][] array = new double[nbSlices][width][height];
+	        for (int r = 0; r < matrix.numRows(); r++) {
+	            for (int c = 0; c < matrix.numCols(); c++) {
+	                int row = (c % (width*height)) / height;
+	                int col = (c % (width*height)) % height;
+	                array[r][row][col] = matrix.get(r, c);
+	            }
+	        }
+	        return array;
+	    }
 
-    private static double[][][] matrix2Array3(SimpleMatrix matrix) {
-        double[][][] array = new double[nbSlices][width][height];
-        for (int r = 0; r < matrix.numRows(); r++) {
-            for (int c = 0; c < matrix.numCols(); c++) {
-                int row = (c % (width * height)) / height;
-                int col = (c % (width * height)) % height;
-                array[r][row][col] = matrix.get(r, c);
-            }
-        }
-        return array;
-    }
+
+	 private static SimpleMatrix QRFactorisation_Q(SimpleMatrix matrix, int negatif) {
+		 if (matrix.numRows() < matrix.numCols()) {
+			 System.out.println("Il doit y avoir plus de lignes que de colonnes");
+			 return null;
+		 }
+
+		 boolean multiplier = false;
+		 if (negatif <= 2) {
+			 multiplier = true;
+		 }
+
+		 SimpleMatrix Q = new SimpleMatrix(matrix.numRows(), matrix.numCols());
+		 Q.zero();
+
+		 SimpleMatrix W, Wbis, Qbis, aux;
+		 for (int i=0; i<Q.numCols(); i++) {
+			 W = matrix.extractVector(false, i);
+			 Wbis = W;
+			 for (int j=0; j<i; j++) {
+				 Qbis = Q.extractVector(false, j);
+				 W = W.minus(Qbis.scale(Wbis.dot(Qbis)));
+			 }
+			 aux = W.divide(W.normF());
+			 double[] res = new double[aux.numRows()];
+			 for (int k=0; k<aux.numRows(); k++) {
+				 if ((multiplier) && (i==Q.numCols()-1)){
+					 res[k] = aux.get(k, 0) * -1;
+					 continue;
+				 }
+				 res[k] = aux.get(k, 0);
+			 }
+
+			 Q.setColumn(i, 0, res);
+		 }
+
+		 return Q;
+
+	 }
+
 
     @Override
     public void run() {
