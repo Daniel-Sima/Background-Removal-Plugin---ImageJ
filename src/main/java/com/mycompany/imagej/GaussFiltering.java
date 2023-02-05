@@ -134,6 +134,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
             generateInterface();
 
+            long startTime = System.nanoTime();
+
             /** originalImg
              * It is matrix[rows*cols] where:
              *   rows = stackSize
@@ -233,15 +235,11 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X.numRows, X.numCols);
                     qr.decompose(X);
                     qr.getQ(X, true);
-
-                    if (j == 1 && i == 1) {
-                        SimpleMatrix.wrap(X).saveToFileCSV("Y.csv");
-                    }
+//                    X = QRFactorisation_Q(X, j);
 
                     /*
                      *   Y update
                      */
-
                     //Y = transposedX * L
                     DenseMatrix64F transposedX = new DenseMatrix64F(X.numCols, X.numRows);
                     CommonOps.transpose(X, transposedX);
@@ -282,12 +280,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                     double ratio = error.get(ii) / error.get(ii - 1);
 
                     if (ratio >= 1.1) {
-                        System.out.println("1eme");
                         increment = Math.max(0.1 * alf, 0.1 * increment);
                         error.set(ii, error.get(ii - 1));
                         alf = 0;
                     } else if (ratio > 0.7) {
-                        System.out.println("2eme");
                         increment = Math.max(increment, 0.25 * alf);
                         alf = alf + increment;
                     }
@@ -384,6 +380,13 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             im2.show();
             original.show();
 
+            long endTime = System.nanoTime();
+            long duration = endTime - startTime;
+            long durationInMilliseconds = duration / 1000000;
+            double durationInSeconds = duration / 1000000000.0;
+            System.out.println("Execution time in nanoseconds: " + duration);
+            System.out.println("Execution time in milliseconds: " + durationInMilliseconds);
+            System.out.println("Execution time in seconds: " + durationInSeconds);
 
             // show the image
             //ij.ui().show(dataset);
@@ -703,11 +706,11 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         return result;
     }
 /*-----------------------------------------------------------------------------------------------------------------------*/
-	private static double mean(SimpleMatrix matrix, int start, int end) {
+	private static double mean(DenseMatrix64F matrix, int start, int end) {
 	    double sum = 0;
 	    int count = 0;
 	    for (int i = start; i < end; i++) {
-	        for (int j = 0; j < matrix.numCols(); j++) {
+	        for (int j = 0; j < matrix.numCols; j++) {
 	            sum += matrix.get(i, j);
 	            count++;
 	        }
@@ -740,10 +743,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 	    }
 
 
-	 private static SimpleMatrix QRFactorisation_Q(SimpleMatrix matrix, int negatif) {
-		 if (matrix.numRows() < matrix.numCols()) {
+	 private static DenseMatrix64F QRFactorisation_Q(DenseMatrix64F matrix, int negatif) {
+		 if (matrix.numRows < matrix.numCols) {
 			 System.out.println("Il doit y avoir plus de lignes que de colonnes");
-			 return null;
+             throw new RuntimeException("Il doit y avoir plus de lignes que de colonnes");
 		 }
 
 		 boolean multiplier = false;
@@ -751,28 +754,38 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 			 multiplier = true;
 		 }
 
-		 SimpleMatrix Q = new SimpleMatrix(matrix.numRows(), matrix.numCols());
+         DenseMatrix64F Q = new DenseMatrix64F(matrix.numRows, matrix.numCols);
 		 Q.zero();
 
-		 SimpleMatrix W, Wbis, Qbis, aux;
-		 for (int i=0; i<Q.numCols(); i++) {
-			 W = matrix.extractVector(false, i);
+         DenseMatrix64F W, Wbis, Qbis, aux;
+		 for (int i=0; i<Q.numCols; i++) {
+             W = new DenseMatrix64F(matrix.numRows, 1);
+             CommonOps.extract(matrix, 0, matrix.numRows, i, i+1, W, 0, 0);
 			 Wbis = W;
 			 for (int j=0; j<i; j++) {
-				 Qbis = Q.extractVector(false, j);
-				 W = W.minus(Qbis.scale(Wbis.dot(Qbis)));
+                 Qbis = new DenseMatrix64F(Q.numRows, 1);
+                 CommonOps.extract(Q, 0, Q.numRows, j, j+1, Qbis, 0, 0);
+                 double dotProduct = 0;
+                 for (int p = 0; p < Wbis.numRows; p++) {
+                     dotProduct += Wbis.get(p, 0) * Qbis.get(p, 0);
+                 }
+                 CommonOps.scale(dotProduct, Qbis, Qbis);
+                 CommonOps.sub(W, Qbis, W);
 			 }
-			 aux = W.divide(W.normF());
-			 double[] res = new double[aux.numRows()];
-			 for (int k=0; k<aux.numRows(); k++) {
-				 if ((multiplier) && (i==Q.numCols()-1)){
+             aux = new DenseMatrix64F(W.numRows, W.numCols);
+             CommonOps.divide(NormOps.normF(W), W, aux);
+			 double[] res = new double[aux.numRows];
+			 for (int k=0; k<aux.numRows; k++) {
+				 if ((multiplier) && (i==Q.numCols-1)){
 					 res[k] = aux.get(k, 0) * -1;
 					 continue;
 				 }
 				 res[k] = aux.get(k, 0);
 			 }
 
-			 Q.setColumn(i, 0, res);
+             for (int row = 0; row < Q.numRows; row++) {
+                 Q.set(row, i, res[row]);
+             }
 		 }
 
 		 return Q;
