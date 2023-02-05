@@ -8,57 +8,36 @@
 
 package com.mycompany.imagej;
 
+import ij.IJ;
+import ij.ImagePlus;
+import ij.ImageStack;
+import ij.gui.GenericDialog;
+import ij.process.ByteProcessor;
+import ij.process.ShortProcessor;
 import net.imagej.Dataset;
 import net.imagej.ImageJ;
 import net.imagej.ops.OpService;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.Img;
-import net.imglib2.img.array.ArrayImgs;
 import net.imglib2.type.numeric.RealType;
+import org.ejml.data.DenseMatrix64F;
+import org.ejml.factory.DecompositionFactory;
+import org.ejml.factory.QRDecomposition;
+import org.ejml.ops.CommonOps;
 import org.ejml.ops.NormOps;
+import org.ejml.simple.SimpleMatrix;
 import org.scijava.command.Command;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 import org.scijava.ui.UIService;
 
-import Jama.Matrix;
-
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
-
-import ij.IJ;
-import ij.ImagePlus;
-import ij.ImageStack;
-import ij.gui.GenericDialog;
-import ij.gui.StackWindow;
-import ij.io.Opener;
-import ij.process.ByteProcessor;
-import ij.process.ImageConverter;
-import ij.process.ImageProcessor;
-import ij.process.ShortProcessor;
-
-import org.ejml.alg.dense.decomposition.qr.QRDecompositionHouseholderColumn;
-import org.ejml.data.DMatrixRMaj;
-import org.ejml.data.DMatrixSparse;
-import org.ejml.data.DMatrixSparseCSC;
-import org.ejml.data.DenseMatrix64F;
-import org.ejml.dense.row.SingularOps_DDRM;
-import org.ejml.dense.row.decomposition.qr.QRDecompositionHouseholderColumn_DDRM;
-import org.ejml.dense.row.factory.DecompositionFactory_DDRM;
-import org.ejml.factory.DecompositionFactory;
-import org.ejml.factory.DecompositionInterface;
-import org.ejml.factory.LinearSolver;
-import org.ejml.factory.LinearSolverFactory;
-import org.ejml.factory.QRDecomposition;
-import org.ejml.interfaces.decomposition.SingularValueDecomposition;
-import org.ejml.interfaces.decomposition.SingularValueDecomposition_F64;
-import org.ejml.ops.CommonOps;
-import org.ejml.ops.SingularOps;
-import org.ejml.simple.SimpleMatrix;
-import org.ejml.simple.SimpleSVD;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.Random;
 
 /**
  * This example illustrates how to create an ImageJ {@link Command} plugin.
@@ -75,6 +54,33 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     //
     // Feel free to add more parameters here...
     //
+    @Parameter
+    private Dataset currentData;
+    @Parameter
+    private UIService uiService;
+    @Parameter
+    private OpService opService;
+    @Override
+    public void run() {
+        final Img<T> image = (Img<T>) currentData.getImgPlus();
+
+        //
+        // Enter image processing code here ...
+        // The following is just a Gauss filtering example
+        //
+        final double[] sigmas = {1.0, 3.0, 5.0};
+
+        List<RandomAccessibleInterval<T>> results = new ArrayList<>();
+
+        for (double sigma : sigmas) {
+            results.add(opService.filter().gauss(image, sigma));
+        }
+
+        // display result
+        for (RandomAccessibleInterval<T> elem : results) {
+            uiService.show(elem);
+        }
+    }
 
     /**
      * This main function serves for development purposes.
@@ -91,13 +97,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static int power = 5;
     private static MODE mode = MODE.SOFT;
     private static int height, width, nbSlices, type, dynamicRange = 8;
-    @Parameter
-    private Dataset currentData;
-    @Parameter
-    private UIService uiService;
-    @Parameter
-    private OpService opService;
-
     public static void main(final String... args) throws Exception {
 
         /*
@@ -598,8 +597,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ImageStack constructImageStack2 ( double [][] matrix , int bit ) {
-    	double min = Double.POSITIVE_INFINITY;
+    private static ImageStack constructImageStack2(double[][] matrix, int bit) {
+        double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
 
         // trouver la valeur minimale et la valeur maximale
@@ -613,21 +612,21 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         // normaliser les données
         for (int i = 0; i < matrix.length; i++) {
             for (int j = 0; j < matrix[i].length; j++) {
-            	matrix[i][j] = ((matrix[i][j] - min) / (max - min)) * (Math.pow(2, dynamicRange) - 1);
+                matrix[i][j] = ((matrix[i][j] - min) / (max - min)) * (Math.pow(2, dynamicRange) - 1);
             }
         }
 
-    	ImageStack newStack = new ImageStack (width, height) ;
-        for (int z = 0; z < nbSlices ; z ++) {
-        	byte[] pixels = new byte[width*height];
-        	if (dynamicRange == 8) {
-        		for (int i = 0; i < pixels.length; i++) {
-            	    pixels[i] = (byte) Math.round(matrix[z][i]);
-            	}
-        		ByteProcessor bp = new ByteProcessor(width, height, pixels);
+        ImageStack newStack = new ImageStack(width, height);
+        for (int z = 0; z < nbSlices; z++) {
+            byte[] pixels = new byte[width * height];
+            if (dynamicRange == 8) {
+                for (int i = 0; i < pixels.length; i++) {
+                    pixels[i] = (byte) Math.round(matrix[z][i]);
+                }
+                ByteProcessor bp = new ByteProcessor(width, height, pixels);
 
                 newStack.addSlice(bp);
-        	}
+            }
 //          } else if (dynamicRange == 16) {
 //          short[][] shortData = new short[S2.length][S2[0].length];
 //          for (int i = 0; i < S2.length; i++) {
@@ -636,12 +635,12 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //              }
 //          }
 //          S2 = shortData;
-        	else {
-        		System.out.println("The dynamic range should be equal to 8 or 16 (bits)");
-        	}
+            else {
+                System.out.println("The dynamic range should be equal to 8 or 16 (bits)");
+            }
         }
 
-    	return newStack;
+        return newStack;
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
@@ -705,116 +704,93 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return result;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
-	private static double mean(DenseMatrix64F matrix, int start, int end) {
-	    double sum = 0;
-	    int count = 0;
-	    for (int i = start; i < end; i++) {
-	        for (int j = 0; j < matrix.numCols; j++) {
-	            sum += matrix.get(i, j);
-	            count++;
-	        }
-	    }
-	    return sum / count;
-	}
 
-	 private static double[][][] matrix2Array(SimpleMatrix matrix) {
-	        double[][][] array = new double[nbSlices][width][height];
-	        for (int r = 0; r < matrix.numRows(); r++) {
-	            for (int c = 0; c < matrix.numCols(); c++) {
-	                int row = (c % (width*height)) / height;
-	                int col = (c % (width*height)) % height;
-	                array[r][row][col] = matrix.get(r, c);
-	            }
-	        }
-	        return array;
-	    }
-
-	 private static double[][][] matrix2Array3(SimpleMatrix matrix) {
-	        double[][][] array = new double[nbSlices][width][height];
-	        for (int r = 0; r < matrix.numRows(); r++) {
-	            for (int c = 0; c < matrix.numCols(); c++) {
-	                int row = (c % (width*height)) / height;
-	                int col = (c % (width*height)) % height;
-	                array[r][row][col] = matrix.get(r, c);
-	            }
-	        }
-	        return array;
-	    }
-
-
-	 private static DenseMatrix64F QRFactorisation_Q(DenseMatrix64F matrix, int negatif) {
-		 if (matrix.numRows < matrix.numCols) {
-			 System.out.println("Il doit y avoir plus de lignes que de colonnes");
-             throw new RuntimeException("Il doit y avoir plus de lignes que de colonnes");
-		 }
-
-		 boolean multiplier = false;
-		 if (negatif <= 2) {
-			 multiplier = true;
-		 }
-
-         DenseMatrix64F Q = new DenseMatrix64F(matrix.numRows, matrix.numCols);
-		 Q.zero();
-
-         DenseMatrix64F W, Wbis, Qbis, aux;
-		 for (int i=0; i<Q.numCols; i++) {
-             W = new DenseMatrix64F(matrix.numRows, 1);
-             CommonOps.extract(matrix, 0, matrix.numRows, i, i+1, W, 0, 0);
-			 Wbis = W;
-			 for (int j=0; j<i; j++) {
-                 Qbis = new DenseMatrix64F(Q.numRows, 1);
-                 CommonOps.extract(Q, 0, Q.numRows, j, j+1, Qbis, 0, 0);
-                 double dotProduct = 0;
-                 for (int p = 0; p < Wbis.numRows; p++) {
-                     dotProduct += Wbis.get(p, 0) * Qbis.get(p, 0);
-                 }
-                 CommonOps.scale(dotProduct, Qbis, Qbis);
-                 CommonOps.sub(W, Qbis, W);
-			 }
-             aux = new DenseMatrix64F(W.numRows, W.numCols);
-             CommonOps.divide(NormOps.normF(W), W, aux);
-			 double[] res = new double[aux.numRows];
-			 for (int k=0; k<aux.numRows; k++) {
-				 if ((multiplier) && (i==Q.numCols-1)){
-					 res[k] = aux.get(k, 0) * -1;
-					 continue;
-				 }
-				 res[k] = aux.get(k, 0);
-			 }
-
-             for (int row = 0; row < Q.numRows; row++) {
-                 Q.set(row, i, res[row]);
-             }
-		 }
-
-		 return Q;
-
-	 }
-
-
-    @Override
-    public void run() {
-        final Img<T> image = (Img<T>) currentData.getImgPlus();
-
-        //
-        // Enter image processing code here ...
-        // The following is just a Gauss filtering example
-        //
-        final double[] sigmas = {1.0, 3.0, 5.0};
-
-        List<RandomAccessibleInterval<T>> results = new ArrayList<>();
-
-        for (double sigma : sigmas) {
-            results.add(opService.filter().gauss(image, sigma));
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    private static double mean(DenseMatrix64F matrix, int start, int end) {
+        double sum = 0;
+        int count = 0;
+        for (int i = start; i < end; i++) {
+            for (int j = 0; j < matrix.numCols; j++) {
+                sum += matrix.get(i, j);
+                count++;
+            }
         }
-
-        // display result
-        for (RandomAccessibleInterval<T> elem : results) {
-            uiService.show(elem);
-        }
+        return sum / count;
     }
 
+    private static double[][][] matrix2Array(SimpleMatrix matrix) {
+        double[][][] array = new double[nbSlices][width][height];
+        for (int r = 0; r < matrix.numRows(); r++) {
+            for (int c = 0; c < matrix.numCols(); c++) {
+                int row = (c % (width * height)) / height;
+                int col = (c % (width * height)) % height;
+                array[r][row][col] = matrix.get(r, c);
+            }
+        }
+        return array;
+    }
+
+    private static double[][][] matrix2Array3(SimpleMatrix matrix) {
+        double[][][] array = new double[nbSlices][width][height];
+        for (int r = 0; r < matrix.numRows(); r++) {
+            for (int c = 0; c < matrix.numCols(); c++) {
+                int row = (c % (width * height)) / height;
+                int col = (c % (width * height)) % height;
+                array[r][row][col] = matrix.get(r, c);
+            }
+        }
+        return array;
+    }
+
+
+    private static DenseMatrix64F QRFactorisation_Q(DenseMatrix64F matrix, int negatif) {
+        if (matrix.numRows < matrix.numCols) {
+            System.out.println("Il doit y avoir plus de lignes que de colonnes");
+            throw new RuntimeException("Il doit y avoir plus de lignes que de colonnes");
+        }
+
+        boolean multiplier = false;
+        if (negatif <= 2) {
+            multiplier = true;
+        }
+
+        DenseMatrix64F Q = new DenseMatrix64F(matrix.numRows, matrix.numCols);
+        Q.zero();
+
+        DenseMatrix64F W, Wbis, Qbis, aux;
+        for (int i = 0; i < Q.numCols; i++) {
+            W = new DenseMatrix64F(matrix.numRows, 1);
+            CommonOps.extract(matrix, 0, matrix.numRows, i, i + 1, W, 0, 0);
+            Wbis = W;
+            for (int j = 0; j < i; j++) {
+                Qbis = new DenseMatrix64F(Q.numRows, 1);
+                CommonOps.extract(Q, 0, Q.numRows, j, j + 1, Qbis, 0, 0);
+                double dotProduct = 0;
+                for (int p = 0; p < Wbis.numRows; p++) {
+                    dotProduct += Wbis.get(p, 0) * Qbis.get(p, 0);
+                }
+                CommonOps.scale(dotProduct, Qbis, Qbis);
+                CommonOps.sub(W, Qbis, W);
+            }
+            aux = new DenseMatrix64F(W.numRows, W.numCols);
+            CommonOps.divide(NormOps.normF(W), W, aux);
+            double[] res = new double[aux.numRows];
+            for (int k = 0; k < aux.numRows; k++) {
+                if ((multiplier) && (i == Q.numCols - 1)) {
+                    res[k] = aux.get(k, 0) * -1;
+                    continue;
+                }
+                res[k] = aux.get(k, 0);
+            }
+
+            for (int row = 0; row < Q.numRows; row++) {
+                Q.set(row, i, res[row]);
+            }
+        }
+
+        return Q;
+
+    }
     private enum MODE {SOFT, HARD;}
 
 }
