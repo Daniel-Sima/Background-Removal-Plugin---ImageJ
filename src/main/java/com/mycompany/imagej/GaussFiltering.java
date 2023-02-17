@@ -81,9 +81,9 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             uiService.show(elem);
         }
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     /**
      * This main function serves for development purposes.
      * It allows you to run the plugin immediately out of
@@ -364,9 +364,9 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                 CommonOps.transpose(originalImg, transposedOriginalImg);
                 originalImg = transposedOriginalImg;
             }
-            
+
             /* Noise: G = originalImg - L - S */
-            DenseMatrix64F G = new DenseMatrix64F(originalImg.numRows, originalImg.numCols); 
+            DenseMatrix64F G = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
             CommonOps.sub(originalImg, L, G);
             CommonOps.sub(G, S, G);
 
@@ -405,9 +405,9 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
     }
 
-/*-----------------------------------------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static ImagePlus importImage(File file, int maxFrames) {
 
         checkFileExtension(file);
@@ -424,7 +424,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             IJ.error("Stack required");
             throw new RuntimeException("Stack required");
         } else { // si plusieurs frames
-            nbSlices = stackSize;
+            nbSlices = maxFrames == 0 ? stackSize : maxFrames;
             if (imp.getType() == ImagePlus.GRAY8) type = 8;
             else if (imp.getType() == ImagePlus.GRAY16) type = 16;
             else {
@@ -438,7 +438,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         return imp;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void checkFileExtension(File file) {
         String fileExtension = getFileExtension(file);
 
@@ -448,7 +448,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             throw new RuntimeException("The file extension should be .tif, .tiff");
         }
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void generateInterface() {
         String[] choice = {"soft", "hard"};
         GenericDialog d = new GenericDialog("Threshold");
@@ -467,14 +467,14 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             return;
         }
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static String getFileExtension(File file) {
         String fileName = file.getName();
         if (fileName.lastIndexOf(".") != -1 && fileName.lastIndexOf(".") != 0)
             return fileName.substring(fileName.lastIndexOf(".") + 1);
         else return "";
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static double[][][] constructMatrix(ImageStack stack, int bit) {
         System.out.println(nbSlices);
         System.out.println(height);
@@ -499,7 +499,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return matrix;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static DenseMatrix64F constructMatrix2(ImageStack stack, int bit) {
         double[][] matrix = new double[nbSlices][width * height];
 
@@ -516,7 +516,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return new DenseMatrix64F(matrix);
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static ArrayList<DenseMatrix64F> svdDecomposition(DenseMatrix64F originalImg) {
         ArrayList<DenseMatrix64F> result = new ArrayList<>(3);
 
@@ -547,8 +547,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         X = invertedX;
 
         // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
-        /* FIXME ca change rien en fait */
-        SimpleMatrix negatif = SimpleMatrix.diag(1, -1);
+        SimpleMatrix negatif = SimpleMatrix.identity(k);
+        negatif.set(k-1, k-1, -1);
         DenseMatrix64F neg = negatif.getMatrix();
 
         DenseMatrix64F negX = new DenseMatrix64F(X.numRows, neg.numCols);
@@ -570,7 +570,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
 
         // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
-        /* FIXME ca change rien en fait */
         DenseMatrix64F negY = new DenseMatrix64F(invertedY.numRows, neg.numCols);
         CommonOps.mult(invertedY, neg, negY);
         Y = negY;
@@ -587,7 +586,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         return result;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static ImageStack constructImageStack(double[][][] matrix, int bit) {
         ImageStack newStack = new ImageStack(width, height);
         for (int z = 0; z < nbSlices; z++) {
@@ -601,7 +600,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         return newStack;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static ImageStack constructImageStack2(double[][] matrix, int bit) {
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
@@ -647,7 +646,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         return newStack;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static double[][] matrix2Array2(DenseMatrix64F matrix) {
         double[][] array = new double[matrix.numRows][matrix.numCols];
         for (int r = 0; r < matrix.numRows; r++) {
@@ -657,7 +656,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return array;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static SimpleMatrix thresholding(SimpleMatrix S) {
         for (int i = 0; i < S.numRows(); i++) {
             for (int j = 0; j < S.numCols(); j++) {
@@ -673,7 +672,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return S;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static DenseMatrix64F threshold(DenseMatrix64F data, double tau, String mode) {
         int rows = data.numRows;
         int cols = data.numCols;
@@ -706,7 +705,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return result;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static double mean(DenseMatrix64F matrix, int start, int end) {
         double sum = 0;
         int count = 0;
@@ -718,7 +717,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return sum / count;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static double[][][] matrix2Array(SimpleMatrix matrix) {
         double[][][] array = new double[nbSlices][width][height];
         for (int r = 0; r < matrix.numRows(); r++) {
@@ -730,7 +729,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return array;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static double[][][] matrix2Array3(SimpleMatrix matrix) {
         double[][][] array = new double[nbSlices][width][height];
         for (int r = 0; r < matrix.numRows(); r++) {
@@ -742,7 +741,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return array;
     }
-/*-----------------------------------------------------------------------------------------------------------------------*/
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     private static DenseMatrix64F QRFactorisation_Q(DenseMatrix64F matrix, int negatif) {
         if (matrix.numRows < matrix.numCols) {
             System.out.println("Il doit y avoir plus de lignes que de colonnes");
