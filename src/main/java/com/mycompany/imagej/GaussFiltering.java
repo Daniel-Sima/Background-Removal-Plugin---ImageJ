@@ -31,6 +31,9 @@ import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 import org.scijava.ui.UIService;
 
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -92,48 +95,29 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
      * @param args whatever, it's ignored
      * @throws Exception
      */
-    private static double tau = 7;
+    private static double tau;
     private static int k = 2;
     private static int rank = 3;
     private static double tol = 0.001;
     private static int power = 5;
     private static MODE mode = MODE.SOFT;
     private static int height, width, nbSlices, type, dynamicRange = 8;
-    public static void main(final String... args) throws Exception {
 
-        /*
-        load file with project properties
-         */
-//        Properties properties = new Properties();
-//        try (InputStream inputStream = GaussFiltering.class.getClassLoader().getResourceAsStream("application.properties")) {
-//            properties.load(inputStream);
-//        } catch (IOException e) {
-//            // handle exception
-//        }
+    private static File file;
+    public static void main(final String... args) throws Exception {
 
         // create the ImageJ application context with all available services
         final ImageJ ij = new ImageJ();
 
-        // affiche l'interface utilisateur pour acceder aux functionnalites
-        ij.ui().showUI();
+        generateInterface();
 
-        // for the future
-        /*  ask the user for a file to open */
-        final File file = ij.ui().chooseFile(null, "open");
+    }
+    /*-----------------------------------------------------------------------------------------------------------------------*/
 
-
-        /*
-        use constantValue from src/main/resources/application.properties for DEV MODE
-         */
-//        String constantValue = properties.getProperty("constant.variable.filename");
-//        final File file = new File(constantValue);
-
-
-        if (file != null) {
+    public static void execute(){
+        if (file.isFile()) {
 
             ImagePlus imp = importImage(file, 0);
-
-            generateInterface();
 
             long startTime = System.nanoTime();
 
@@ -407,7 +391,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static ImagePlus importImage(File file, int maxFrames) {
 
         checkFileExtension(file);
@@ -450,22 +433,27 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void generateInterface() {
-        String[] choice = {"soft", "hard"};
-        GenericDialog d = new GenericDialog("Threshold");
-        d.addNumericField("tau:", tau, 2);
-        d.addChoice("soft or hard thresholding", choice, choice[0]);
-        d.showDialog();
-        if (d.wasCanceled()) return;
 
-        // recuperation de la valeur saisie par l'user
-        tau = d.getNextNumber();
-        int c = d.getNextChoiceIndex();
-        if (c == 0) mode = MODE.SOFT;
-        else mode = MODE.HARD;
-        if (d.invalidNumber()) {
-            IJ.error("Invalid parameters");
-            return;
-        }
+        MyDialog.createInterface();
+
+//        String[] choice = {"soft", "hard"};
+//        d = new GenericDialog("Low Rank and Sparse tool");
+//        Button preview = new Button("Preview");
+//        d.addNumericField("tau:", tau, 2);
+//        d.addChoice("soft or hard thresholding", choice, choice[0]);
+//        d.showDialog();
+//        if (d.wasCanceled()) return;
+//        // recuperation de la valeur saisie par l'user
+//        tau = d.getNextNumber();
+//        String filePath = d.getNextString();
+//        IJ.log("Selected file path: " + filePath);
+//        int c = d.getNextChoiceIndex();
+//        if (c == 0) mode = MODE.SOFT;
+//        else mode = MODE.HARD;
+//        if (d.invalidNumber()) {
+//            IJ.error("Invalid parameters");
+//            return;
+//        }
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static String getFileExtension(File file) {
@@ -791,6 +779,14 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
     }
     private enum MODE {SOFT, HARD;}
+
+    static void setTau(double value) {
+        tau = value;
+    }
+
+    static void setFile(String filePath) {
+        file = new File(filePath);
+    }
 }
 /*-----------------------------------------------------------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------------------------------------------*/
