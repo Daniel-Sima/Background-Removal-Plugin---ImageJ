@@ -13,33 +13,19 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.gui.GenericDialog;
 import ij.process.ByteProcessor;
-import ij.process.ShortProcessor;
 import net.imagej.Dataset;
 import net.imagej.ImageJ;
 import net.imagej.ops.OpService;
-import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.img.Img;
 import net.imglib2.type.numeric.RealType;
-import org.ejml.data.DenseMatrix64F;
-import org.ejml.factory.DecompositionFactory;
-import org.ejml.factory.QRDecomposition;
-import org.ejml.ops.CommonOps;
-import org.ejml.ops.NormOps;
 import org.ejml.simple.SimpleMatrix;
+import org.ejml.simple.SimpleSVD;
 import org.scijava.command.Command;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 import org.scijava.ui.UIService;
 
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 
 /**
@@ -65,28 +51,9 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private OpService opService;
     @Override
     public void run() {
-        final Img<T> image = (Img<T>) currentData.getImgPlus();
-
-        //
-        // Enter image processing code here ...
-        // The following is just a Gauss filtering example
-        //
-        final double[] sigmas = {1.0, 3.0, 5.0};
-
-        List<RandomAccessibleInterval<T>> results = new ArrayList<>();
-
-        for (double sigma : sigmas) {
-            results.add(opService.filter().gauss(image, sigma));
-        }
-
-        // display result
-        for (RandomAccessibleInterval<T> elem : results) {
-            uiService.show(elem);
-        }
+        execute();
     }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    /*-----------------------------------------------------------------------------------------------------------------------*/
+
     /**
      * This main function serves for development purposes.
      * It allows you to run the plugin immediately out of
@@ -95,29 +62,31 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
      * @param args whatever, it's ignored
      * @throws Exception
      */
-    private static double tau;
+    private static double tau = 7;
     private static int k = 2;
     private static int rank = 3;
     private static double tol = 0.001;
     private static int power = 5;
     private static MODE mode = MODE.SOFT;
     private static int height, width, nbSlices, type, dynamicRange = 8;
-
-    private static File file;
+  
     public static void main(final String... args) throws Exception {
 
         // create the ImageJ application context with all available services
         final ImageJ ij = new ImageJ();
 
-        generateInterface();
+        // affiche l'interface utilisateur pour acceder aux functionnalites
+        ij.ui().showUI();
 
-    }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
+        // for the future
+        /*  ask the user for a file to open */
+        final File file = ij.ui().chooseFile(null, "open");
 
-    public static void execute(){
-        if (file.isFile()) {
+        if (file != null) {
 
             ImagePlus imp = importImage(file, 0);
+
+            generateInterface();
 
             long startTime = System.nanoTime();
 
@@ -128,14 +97,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
              * This means that each line represents one of the layers of the tif image
              *
              */
-            DenseMatrix64F originalImg = constructMatrix2(imp.getStack(), type);
+            SimpleMatrix originalImg = constructMatrix(imp.getStack(), type);
 
             //transposing
-            DenseMatrix64F origImgTransposed = new DenseMatrix64F(originalImg.numCols, originalImg.numRows);
-            CommonOps.transpose(originalImg, origImgTransposed);
-
-            //taking the transposed image matrix for future operations
-            originalImg = origImgTransposed;
+            originalImg = originalImg.transpose();
 
             /*
              * SVD decomposition
@@ -144,44 +109,39 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
              * Y = Unitary matrix having right singular vectors as rows.
              * s = Diagonal matrix with singular values.
              */
-            ArrayList<DenseMatrix64F> svdResult = svdDecomposition(originalImg);
+            ArrayList<SimpleMatrix> svdResult = svdDecomposition(originalImg);
 
-            DenseMatrix64F X = svdResult.get(0);
-            DenseMatrix64F Y = svdResult.get(1);
-            DenseMatrix64F s = svdResult.get(2);
+            SimpleMatrix X = svdResult.get(0);
+            SimpleMatrix Y = svdResult.get(1);
+            SimpleMatrix s = svdResult.get(2);
 
             // X = X * s
-            DenseMatrix64F sX = new DenseMatrix64F(X.numRows, s.numCols);
-            CommonOps.mult(X, s, sX);
-            X = sX;
+            X = X.mult(s);
 
             //L = X * Y
-            DenseMatrix64F L = new DenseMatrix64F(X.numRows, Y.numCols);
-            CommonOps.mult(X, Y, L);
+            SimpleMatrix L = X.mult(Y);
 
             //S = originalImg - L
-            DenseMatrix64F S = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
-            CommonOps.sub(originalImg, L, S);
+            SimpleMatrix S = originalImg.minus(L);
 
             //thresholding
-            DenseMatrix64F thresholdS = threshold(S, tau, String.valueOf(mode));
+            S = threshold(S, tau, String.valueOf(mode));
 
             //error calculation
             int rankk = (int) Math.round((double) rank / k);
-            DenseMatrix64F error = new DenseMatrix64F(rank * power, 1);
+            SimpleMatrix error = new SimpleMatrix(rank * power, 1);
 
             //T = S - thresholdS
-            DenseMatrix64F T = new DenseMatrix64F(S.numRows, S.numCols);
-            CommonOps.sub(S, thresholdS, T);
+            SimpleMatrix T = (originalImg.minus(L)).minus(S);
 
-            double normD = NormOps.normF(originalImg);
-            double normT = NormOps.normF(T);
+            double normD = originalImg.normF();
+            double normT = T.normF();
 
             error.set(0, normT / normD);
 
             int iii = 1;
             boolean stop = false;
-            double alf;
+            double alf = 0;
 
             for (int i = 1; i < rankk + 1; i++) {
                 i = i - 1;
@@ -199,65 +159,57 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                      *  X update
                      */
 
-                    //Y transpose
-                    DenseMatrix64F transposedY = new DenseMatrix64F(Y.numCols, Y.numRows);
-                    CommonOps.transpose(Y, transposedY);
-
                     //X = abs(L * transposedY)
-                    DenseMatrix64F LY = new DenseMatrix64F(L.numRows, transposedY.numCols);
-                    CommonOps.mult(L, transposedY, LY);
-                    X = LY;
-                    for (int k = 0; k < X.numCols; k++) {
-                        for (int l = 0; l < X.numRows; l++) {
+                    X = (L.mult(Y.transpose()));
+                    for (int k = 0; k < X.numCols(); k++) {
+                        for (int l = 0; l < X.numRows(); l++) {
                             X.set(l, k, Math.abs(X.get(l, k)));
                         }
                     }
 
                     /* Do a QR decomposition */
-                    /* Possible qu'ici la decomposition se fasse mal */
+//                    DenseMatrix64F X2 = X.getMatrix();
+//                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
+//                    qr.decompose(X2);
+//                    qr.getQ(X2, true);
+//                    X = SimpleMatrix.wrap(X2);
 
-                    //X = qr.Q
-                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X.numRows, X.numCols);
-                    qr.decompose(X);
-                    qr.getQ(X, true);
-//                    X = QRFactorisation_Q(X, j);
-
+                    X = QRFactorisation_Q(X, j);
+//
                     /*
                      *   Y update
                      */
                     //Y = transposedX * L
-                    DenseMatrix64F transposedX = new DenseMatrix64F(X.numCols, X.numRows);
-                    CommonOps.transpose(X, transposedX);
-                    CommonOps.mult(transposedX, L, Y);
+                    Y = (X.transpose()).mult(L);
 
                     //L = X * Y
-                    CommonOps.mult(X, Y, L);
+                    L = X.mult(Y);
 
                     /*
                      *  S update
                      */
                     //T = originalImg - L
-                    CommonOps.sub(originalImg, L, T);
+                    T = originalImg.minus(L);
                     //thresholding
+//                    S = thresholding(T);
                     S = threshold(T, tau, String.valueOf(mode));
 
                     // Error, stopping criteria
                     //T = T - S
-                    CommonOps.sub(T, S, T);
+                    T = T.minus(S);
 
                     int ii = iii + j - 1;
 
-                    normT = NormOps.normF(T);
+                    normT = T.normF();
+
                     error.set(ii, normT / normD);
 
                     if (error.get(ii) < tol) {
                         stop = true;
-                        System.out.println("Stop");
                         break;
                     }
 
                     if (rrank != rank) {
-                        System.out.println("rrank != rank");
                         rank = rrank;
                     }
 
@@ -277,19 +229,18 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                      *   Update of L
                      */
                     //T = (1 + alf) * T
-                    CommonOps.scale(1 + alf, T, T);
-                    //L = L * T
-                    CommonOps.add(L, T, L);
+                    //L = L + T
+                    L = L.plus(T.scale(1 + alf));
 
                     // Add corest AR
                     if (j > 8) {
                         double mean = mean(error, ii - 7, ii);
                         if (mean > 0.92) {
                             iii = ii;
-                            int YCol = Y.numCols;
-                            int XRow = X.numRows;
+                            int YCol = Y.numCols();
+                            int XRow = X.numRows();
                             if ((YCol - XRow) >= k) {
-                                CommonOps.extract(Y, 0, XRow - 1, 0, Y.numCols, Y, 0, 0);
+                                Y = Y.extractMatrix(0, XRow - 1, 0, YCol);
                             }
                             break;
                         }
@@ -303,70 +254,49 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //            	AR
                 if (i + 1 < rankk) {
                     Random r = new Random();
-                    DenseMatrix64F RR = new DenseMatrix64F(k, originalImg.numRows);
+                    SimpleMatrix RR = new SimpleMatrix(k, originalImg.numRows());
                     for (int x = 0; x < k; x++) {
-                        for (int z = 0; z < originalImg.numRows; z++) {
+                        for (int z = 0; z < originalImg.numRows(); z++) {
                             RR.set(x, z, r.nextGaussian());
-//            	    		RR.set(x, z, 1.0);
+                            //RR.set(x, z, 1.0);
                         }
                     }
-
                     //v = RR * L
-                    DenseMatrix64F v = new DenseMatrix64F(RR.numRows, L.numCols);
-                    CommonOps.mult(RR, L, v);
-
+                    SimpleMatrix v = RR.mult(L);
                     //Y = combine(Y, v)
-                    DenseMatrix64F newY = new DenseMatrix64F(Y.numRows * 2, Y.numCols);
-                    for (int p = 0; p < Y.numRows; p++) {
-                        for (int q = 0; q < Y.numCols; q++) {
-                            newY.set(p, q, Y.get(p, q));
-                        }
-                    }
-                    for (int p = 0; p < v.numRows; p++) {
-                        for (int q = 0; q < v.numCols; q++) {
-                            newY.set(p + Y.numRows, q, v.get(p, q));
-                        }
-                    }
-                    Y = newY;
+                    Y = Y.combine(2, 0, v);
                 }
                 i++;
+
             }
 
             //L = X * Y
-            CommonOps.mult(X, Y, L);
+            L = X.mult(Y);
 
-            if (originalImg.numRows > originalImg.numCols) {
-                DenseMatrix64F transposedL = new DenseMatrix64F(L.numCols, L.numRows);
-                CommonOps.transpose(L, transposedL);
-                L = transposedL;
+            if (originalImg.numRows() > originalImg.numCols()) {
 
-                DenseMatrix64F transposedS = new DenseMatrix64F(S.numCols, S.numRows);
-                CommonOps.transpose(S, transposedS);
-                S = transposedS;
-
-                DenseMatrix64F transposedOriginalImg = new DenseMatrix64F(originalImg.numCols, originalImg.numRows);
-                CommonOps.transpose(originalImg, transposedOriginalImg);
-                originalImg = transposedOriginalImg;
+                L = L.transpose();
+                S = S.transpose();
+                originalImg = originalImg.transpose();
             }
 
             /* Noise: G = originalImg - L - S */
-            DenseMatrix64F G = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
-            CommonOps.sub(originalImg, L, G);
-            CommonOps.sub(G, S, G);
+
 
             double[][] A2 = matrix2Array2(originalImg);
             double[][] L2 = matrix2Array2(L);
             double[][] S2 = matrix2Array2(S);
             double[][] G2 = matrix2Array2(G);
 
-            ImagePlus original = new ImagePlus("Original Image", constructImageStack2(
+            ImagePlus original = new ImagePlus(" Original Image ", constructImageStack2(
                     A2, type));
-            ImagePlus im = new ImagePlus("Background Image", constructImageStack2(
+            ImagePlus im = new ImagePlus(" Background Image ", constructImageStack2(
                     L2, type));
-            ImagePlus im2 = new ImagePlus("Sparse Image", constructImageStack2(
+            ImagePlus im2 = new ImagePlus(" Sparse Image ", constructImageStack2(
                     S2, type));
             /* Construction du stack d'images pour le bruit (noise) */
             ImagePlus noise = new ImagePlus("Noise Image", constructImageStack2(G2, type));
+
 
             im.show();
             im2.show();
@@ -380,6 +310,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             System.out.println("Execution time in nanoseconds: " + duration);
             System.out.println("Execution time in milliseconds: " + durationInMilliseconds);
             System.out.println("Execution time in seconds: " + durationInSeconds);
+            noise.show();		// Affichage du bruit (noise)
 
             // show the image
             //ij.ui().show(dataset);
@@ -433,27 +364,23 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void generateInterface() {
-
-        MyDialog.createInterface();
-
-//        String[] choice = {"soft", "hard"};
-//        d = new GenericDialog("Low Rank and Sparse tool");
-//        Button preview = new Button("Preview");
-//        d.addNumericField("tau:", tau, 2);
-//        d.addChoice("soft or hard thresholding", choice, choice[0]);
-//        d.showDialog();
-//        if (d.wasCanceled()) return;
-//        // recuperation de la valeur saisie par l'user
-//        tau = d.getNextNumber();
-//        String filePath = d.getNextString();
-//        IJ.log("Selected file path: " + filePath);
-//        int c = d.getNextChoiceIndex();
-//        if (c == 0) mode = MODE.SOFT;
-//        else mode = MODE.HARD;
-//        if (d.invalidNumber()) {
-//            IJ.error("Invalid parameters");
-//            return;
-//        }
+        String[] choice = {"soft", "hard"};
+        d = new GenericDialog("Low Rank and Sparse tool");
+        Button preview = new Button("Preview");
+        d.addNumericField("tau:", tau, 2);
+        d.addChoice("soft or hard thresholding", choice, choice[0]);
+        d.showDialog();
+        if (d.wasCanceled()) return;
+        // recuperation de la valeur saisie par l'user
+        tau = d.getNextNumber();
+        String filePath = d.getNextString();
+        int c = d.getNextChoiceIndex();
+        if (c == 0) mode = MODE.SOFT;
+        else mode = MODE.HARD;
+        if (d.invalidNumber()) {
+            IJ.error("Invalid parameters");
+            return;
+        }
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static String getFileExtension(File file) {
@@ -487,8 +414,66 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return matrix;
     }
+
+    private static ArrayList<SimpleMatrix> svdDecomposition(SimpleMatrix originalImg) {
+        ArrayList<SimpleMatrix> result = new ArrayList<>(3);
+
+        SimpleMatrix U = null, W = null, V = null, check = null;
+        SimpleSVD<SimpleMatrix> svd = originalImg.svd(true); // compacte pour aller plus vite ...
+
+        U = svd.getU();
+        W = svd.getW();
+        V = svd.getV();
+
+        //taking k first columns as having biggest singular values
+        SimpleMatrix X = U.extractMatrix(0, U.numRows(), 0, k); // CMMT
+
+        //putting X to ascending order
+        SimpleMatrix invertedX = new SimpleMatrix(X.numRows(), X.numCols());
+        for (int e = X.numCols() - 1, i = 0; i < X.numCols(); i++, e--) {
+            for (int j = 0; j < X.numRows(); j++) {
+                invertedX.set(j, e, X.get(j, i));
+            }
+        }
+        // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
+        SimpleMatrix negatif = SimpleMatrix.diag(1, -1);
+        invertedX = invertedX.mult(negatif);
+
+        X = invertedX;
+
+        result.add(X);
+
+        //taking k first columns as having biggest singular values
+        SimpleMatrix Y = svd.getV().extractMatrix(0, V.numCols(), 0, k); // CMMT
+
+        //putting Y to ascending order
+        SimpleMatrix invertedY = new SimpleMatrix(Y.numRows(), Y.numCols());
+        for (int e = Y.numCols() - 1, i = 0; i < Y.numCols(); i++, e--) {
+            for (int j = 0; j < Y.numRows(); j++) {
+                invertedY.set(j, e, Y.get(j, i));
+            }
+        }
+        invertedY = invertedY.mult(negatif);
+        invertedY = invertedY.transpose();
+        Y = invertedY;
+        result.add(Y);
+
+        //getting submatrix of SingularValues in inverted order
+        SimpleMatrix sVals = W.extractMatrix(0, k, 0, k);
+        SimpleMatrix sDiag = sVals.extractDiag();
+
+        double[] valS = new double[sDiag.numRows()];
+        for (int j = 0, i = sDiag.numRows() - 1; i >= 0; i--, j++) {
+            valS[j] = sDiag.get(i, 0);
+        }
+        SimpleMatrix s = SimpleMatrix.diag(valS);
+        result.add(s);
+
+        return result;
+    }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static DenseMatrix64F constructMatrix2(ImageStack stack, int bit) {
+    private static SimpleMatrix constructMatrix2(ImageStack stack, int bit) {
         double[][] matrix = new double[nbSlices][width * height];
 
         if (bit == 8) {
@@ -502,78 +487,9 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                 }
             }
         }
-        return new DenseMatrix64F(matrix);
+        return new SimpleMatrix(matrix);
     }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ArrayList<DenseMatrix64F> svdDecomposition(DenseMatrix64F originalImg) {
-        ArrayList<DenseMatrix64F> result = new ArrayList<>(3);
 
-        org.ejml.factory.SingularValueDecomposition<DenseMatrix64F> svd =
-                DecompositionFactory.svd(originalImg.numRows, k, true, true, true);
-
-        svd.decompose(originalImg);
-        DenseMatrix64F U = svd.getU(null, false);
-        DenseMatrix64F W = svd.getW(null);
-        DenseMatrix64F V = svd.getV(null, false);
-        double[] allSingVals = svd.getSingularValues();
-        double[] kSingVals = new double[k];
-        for (int i = 0; i < k; i++) {
-            kSingVals[i] = allSingVals[k - 1 - i];
-        }
-
-        //taking k first columns as having biggest singular values
-        DenseMatrix64F X = new DenseMatrix64F(U.numRows, k);
-        CommonOps.extract(U, 0, U.numRows, 0, k, X, 0, 0);
-
-        //putting X to ascending order
-        DenseMatrix64F invertedX = new DenseMatrix64F(X.numRows, X.numCols);
-        for (int e = X.numCols - 1, i = 0; i < X.numCols; i++, e--) {
-            for (int j = 0; j < X.numRows; j++) {
-                invertedX.set(j, e, X.get(j, i));
-            }
-        }
-        X = invertedX;
-
-        // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
-        SimpleMatrix negatif = SimpleMatrix.identity(k);
-        negatif.set(k-1, k-1, -1);
-        DenseMatrix64F neg = negatif.getMatrix();
-
-        DenseMatrix64F negX = new DenseMatrix64F(X.numRows, neg.numCols);
-        CommonOps.mult(X, neg, negX);
-        X = negX;
-
-        result.add(X);
-
-        //taking k first columns as having biggest singular values
-        DenseMatrix64F Y = new DenseMatrix64F(V.numRows, k);
-        CommonOps.extract(V, 0, V.numRows, 0, k, Y, 0, 0);
-
-        //putting Y to ascending order
-        DenseMatrix64F invertedY = new DenseMatrix64F(Y.numRows, Y.numCols);
-        for (int e = Y.numCols - 1, i = 0; i < Y.numCols; i++, e--) {
-            for (int j = 0; j < Y.numRows; j++) {
-                invertedY.set(j, e, Y.get(j, i));
-            }
-        }
-
-        // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
-        DenseMatrix64F negY = new DenseMatrix64F(invertedY.numRows, neg.numCols);
-        CommonOps.mult(invertedY, neg, negY);
-        Y = negY;
-
-        DenseMatrix64F YTrans = new DenseMatrix64F(Y.numCols, Y.numRows);
-        CommonOps.transpose(Y, YTrans);
-
-        Y = YTrans;
-        result.add(Y);
-
-        //getting submatrix of SingularValues in inverted order
-        SimpleMatrix s = SimpleMatrix.diag(kSingVals);
-        result.add(s.getMatrix());
-
-        return result;
-    }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     private static ImageStack constructImageStack(double[][][] matrix, int bit) {
         ImageStack newStack = new ImageStack(width, height);
@@ -588,6 +504,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         return newStack;
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
     private static ImageStack constructImageStack2(double[][] matrix, int bit) {
         double min = Double.POSITIVE_INFINITY;
@@ -634,16 +551,34 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         return newStack;
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double[][] matrix2Array2(DenseMatrix64F matrix) {
-        double[][] array = new double[matrix.numRows][matrix.numCols];
-        for (int r = 0; r < matrix.numRows; r++) {
-            for (int c = 0; c < matrix.numCols; c++) {
+    private static ImageStack constructImageStack3(double[][] matrix, int bit) {
+        ImageStack newStack = new ImageStack(width, height);
+        for (int z = 0; z < nbSlices; z++) {
+            byte[] pixels = new byte[width * height];
+            for (int i = 0; i < pixels.length; i++) {
+                pixels[i] = (byte) (matrix[z][i] + 0.5);
+            }
+            ByteProcessor bp = new ByteProcessor(width, height, pixels);
+
+            newStack.addSlice("slice " + (z + 1), bp);
+        }
+
+        return newStack;
+    }
+
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    private static double[][] matrix2Array2(SimpleMatrix matrix) {
+        double[][] array = new double[matrix.numRows()][matrix.numCols()];
+        for (int r = 0; r < matrix.numRows(); r++) {
+            for (int c = 0; c < matrix.numCols(); c++) {
                 array[r][c] = matrix.get(r, c);
             }
         }
         return array;
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
     private static SimpleMatrix thresholding(SimpleMatrix S) {
         for (int i = 0; i < S.numRows(); i++) {
@@ -660,11 +595,12 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return S;
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    public static DenseMatrix64F threshold(DenseMatrix64F data, double tau, String mode) {
-        int rows = data.numRows;
-        int cols = data.numCols;
-        DenseMatrix64F result = new DenseMatrix64F(rows, cols);
+    public static SimpleMatrix threshold(SimpleMatrix data, double tau, String mode) {
+        int rows = data.numRows();
+        int cols = data.numCols();
+        SimpleMatrix result = new SimpleMatrix(rows, cols);
         if (mode.equals("SOFT")) {
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < cols; j++) {
@@ -693,19 +629,20 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return result;
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double mean(DenseMatrix64F matrix, int start, int end) {
+    private static double mean(SimpleMatrix matrix, int start, int end) {
         double sum = 0;
         int count = 0;
         for (int i = start; i < end; i++) {
-            for (int j = 0; j < matrix.numCols; j++) {
+            for (int j = 0; j < matrix.numCols(); j++) {
                 sum += matrix.get(i, j);
                 count++;
             }
         }
         return sum / count;
     }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
+
     private static double[][][] matrix2Array(SimpleMatrix matrix) {
         double[][][] array = new double[nbSlices][width][height];
         for (int r = 0; r < matrix.numRows(); r++) {
@@ -717,7 +654,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return array;
     }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
+
     private static double[][][] matrix2Array3(SimpleMatrix matrix) {
         double[][][] array = new double[nbSlices][width][height];
         for (int r = 0; r < matrix.numRows(); r++) {
@@ -729,11 +666,11 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return array;
     }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static DenseMatrix64F QRFactorisation_Q(DenseMatrix64F matrix, int negatif) {
-        if (matrix.numRows < matrix.numCols) {
+
+    private static SimpleMatrix QRFactorisation_Q(SimpleMatrix matrix, int negatif) {
+        if (matrix.numRows() < matrix.numCols()) {
             System.out.println("Il doit y avoir plus de lignes que de colonnes");
-            throw new RuntimeException("Il doit y avoir plus de lignes que de colonnes");
+            return null;
         }
 
         boolean multiplier = false;
@@ -741,52 +678,39 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             multiplier = true;
         }
 
-        DenseMatrix64F Q = new DenseMatrix64F(matrix.numRows, matrix.numCols);
+        SimpleMatrix Q = new SimpleMatrix(matrix.numRows(), matrix.numCols());
         Q.zero();
 
-        DenseMatrix64F W, Wbis, Qbis, aux;
-        for (int i = 0; i < Q.numCols; i++) {
-            W = new DenseMatrix64F(matrix.numRows, 1);
-            CommonOps.extract(matrix, 0, matrix.numRows, i, i + 1, W, 0, 0);
+        SimpleMatrix W, Wbis, Qbis, aux;
+        for (int i = 0; i < Q.numCols(); i++) {
+            W = matrix.extractVector(false, i);
             Wbis = W;
             for (int j = 0; j < i; j++) {
-                Qbis = new DenseMatrix64F(Q.numRows, 1);
-                CommonOps.extract(Q, 0, Q.numRows, j, j + 1, Qbis, 0, 0);
-                double dotProduct = 0;
-                for (int p = 0; p < Wbis.numRows; p++) {
-                    dotProduct += Wbis.get(p, 0) * Qbis.get(p, 0);
-                }
-                CommonOps.scale(dotProduct, Qbis, Qbis);
-                CommonOps.sub(W, Qbis, W);
+                Qbis = Q.extractVector(false, j);
+                W = W.minus(Qbis.scale(Wbis.dot(Qbis)));
             }
-            aux = new DenseMatrix64F(W.numRows, W.numCols);
-            CommonOps.divide(NormOps.normF(W), W, aux);
-            double[] res = new double[aux.numRows];
-            for (int k = 0; k < aux.numRows; k++) {
-                if ((multiplier) && (i == Q.numCols - 1)) {
+            aux = W.divide(W.normF());
+            double[] res = new double[aux.numRows()];
+            for (int k = 0; k < aux.numRows(); k++) {
+                if ((multiplier) && (i == Q.numCols() - 1)) {
                     res[k] = aux.get(k, 0) * -1;
                     continue;
                 }
                 res[k] = aux.get(k, 0);
             }
 
-            for (int row = 0; row < Q.numRows; row++) {
-                Q.set(row, i, res[row]);
-            }
+            Q.setColumn(i, 0, res);
         }
 
         return Q;
 
     }
+
+
+
+
     private enum MODE {SOFT, HARD;}
 
-    static void setTau(double value) {
-        tau = value;
-    }
-
-    static void setFile(String filePath) {
-        file = new File(filePath);
-    }
 }
 /*-----------------------------------------------------------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------------------------------------------*/
