@@ -71,7 +71,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static int power = 5;
     private static MODE mode = MODE.SOFT;
     private enum MODE {SOFT, HARD;}
-    private static int height, width, nbSlices, type, dynamicRange = 8;
+    private static int height, width, nbSlices, nbSlicesPreview, type, dynamicRange = 8;
     public static void main(final String... args) throws Exception {
 
         // create the ImageJ application context with all available services
@@ -256,7 +256,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
                         int YCol = Y.numCols();
                         int XRow = X.numRows();
                         if ((YCol - XRow) >= k) {
-                            Y = Y.extractMatrix(0, XRow - 1, 0, YCol);
+                            Y = Y.extractMatrix(0, XRow - 1, 0, Y.numCols());
                         }
                         break;
                     }
@@ -339,13 +339,13 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         if (imp.getStackSize() < 2) {
             IJ.error("Stack required");
             throw new RuntimeException("Stack required");
-        } else { // si plusieurs frames
-            nbSlices = maxFrames == 0 ? stackSize : maxFrames;
+        } else {
+            nbSlicesPreview = Math.min(stackSize, 100);
+            nbSlices = stackSize;
             if (imp.getType() == ImagePlus.GRAY8) type = 8;
             else if (imp.getType() == ImagePlus.GRAY16) type = 16;
             else {
                 IJ.error("Image type not supported ( only GRAY8 and GRAY16 )");
-                throw new RuntimeException("Image type not supported ( only GRAY8 and GRAY16 )");
             }
         }
 
@@ -573,7 +573,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static SimpleMatrix QRFactorisation_Q(SimpleMatrix matrix, int negatif) {
         if (matrix.numRows() < matrix.numCols()) {
             System.out.println("Il doit y avoir plus de lignes que de colonnes");
-            return null;
+            throw new RuntimeException("Il doit y avoir plus de lignes que de colonnes");
         }
 
         boolean multiplier = false;
