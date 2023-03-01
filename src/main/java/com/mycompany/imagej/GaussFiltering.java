@@ -411,7 +411,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
             }
         }
         // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
-        SimpleMatrix negatif = SimpleMatrix.diag(1, -1);
+        SimpleMatrix negatif = SimpleMatrix.identity(k);
+        negatif.set(k-1, k-1, -1);
         invertedX = invertedX.mult(negatif);
 
         X = invertedX;
