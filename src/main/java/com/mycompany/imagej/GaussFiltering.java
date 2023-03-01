@@ -13,6 +13,7 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.gui.GenericDialog;
 import ij.process.ByteProcessor;
+import ij.process.ShortProcessor;
 import net.imagej.Dataset;
 import net.imagej.ImageJ;
 import net.imagej.ops.OpService;
@@ -40,6 +41,7 @@ import java.util.Random;
  */
 @Plugin(type = Command.class, menuPath = "Plugins>Gauss Filtering")
 public class GaussFiltering<T extends RealType<T>> implements Command {
+
     //
     // Feel free to add more parameters here...
     //
@@ -68,8 +70,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private static double tol = 0.001;
     private static int power = 5;
     private static MODE mode = MODE.SOFT;
+    private enum MODE {SOFT, HARD;}
     private static int height, width, nbSlices, type, dynamicRange = 8;
-  
     public static void main(final String... args) throws Exception {
 
         // create the ImageJ application context with all available services
@@ -83,251 +85,251 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         final File file = ij.ui().chooseFile(null, "open");
 
         if (file != null) {
+            checkFileExtension(file);
 
-            ImagePlus imp = importImage(file, 0);
+            //load image in object
+            ImagePlus imp = IJ.openImage(file.getPath());  // image
+            importImage(imp, 0);
 
-            generateInterface();
+            process(imp);
+        }
+    }
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    public static void execute() {
+        ImagePlus imp = IJ.getImage();
+        importImage(imp, 0);
+        process(imp);
+    }
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+    public static void process(ImagePlus imp) {
+        generateInterface();
 
-            long startTime = System.nanoTime();
+        long startTime = System.nanoTime();
 
-            /** originalImg
-             * It is matrix[rows*cols] where:
-             *   rows = stackSize
-             *   cols = width*height
-             * This means that each line represents one of the layers of the tif image
-             *
-             */
-            SimpleMatrix originalImg = constructMatrix(imp.getStack(), type);
+        /** originalImg
+         * It is matrix[rows*cols] where:
+         *   rows = stackSize
+         *   cols = width*height
+         * This means that each line represents one of the layers of the tif image
+         *
+         */
+        SimpleMatrix originalImg = constructMatrix(imp.getStack(), type);
 
-            //transposing
-            originalImg = originalImg.transpose();
+        //transposing
+        originalImg = originalImg.transpose();
 
-            /*
-             * SVD decomposition
-             * svdResult = ArrayList<X, Y, s>
-             * X = Unitary matrix having left singular vectors as columns.
-             * Y = Unitary matrix having right singular vectors as rows.
-             * s = Diagonal matrix with singular values.
-             */
-            ArrayList<SimpleMatrix> svdResult = svdDecomposition(originalImg);
+        /*
+         * SVD decomposition
+         * svdResult = ArrayList<X, Y, s>
+         * X = Unitary matrix having left singular vectors as columns.
+         * Y = Unitary matrix having right singular vectors as rows.
+         * s = Diagonal matrix with singular values.
+         */
+        ArrayList<SimpleMatrix> svdResult = svdDecomposition(originalImg);
 
-            SimpleMatrix X = svdResult.get(0);
-            SimpleMatrix Y = svdResult.get(1);
-            SimpleMatrix s = svdResult.get(2);
+        SimpleMatrix X = svdResult.get(0);
+        SimpleMatrix Y = svdResult.get(1);
+        SimpleMatrix s = svdResult.get(2);
 
-            // X = X * s
-            X = X.mult(s);
+        // X = X * s
+        X = X.mult(s);
 
-            //L = X * Y
-            SimpleMatrix L = X.mult(Y);
+        //L = X * Y
+        SimpleMatrix L = X.mult(Y);
 
-            //S = originalImg - L
-            SimpleMatrix S = originalImg.minus(L);
+        //S = originalImg - L
+        SimpleMatrix S = originalImg.minus(L);
 
-            //thresholding
-            S = threshold(S, tau, String.valueOf(mode));
+        //thresholding
+        S = threshold(S, tau, String.valueOf(mode));
 
-            //error calculation
-            int rankk = (int) Math.round((double) rank / k);
-            SimpleMatrix error = new SimpleMatrix(rank * power, 1);
+        //error calculation
+        int rankk = (int) Math.round((double) rank / k);
+        SimpleMatrix error = new SimpleMatrix(rank * power, 1);
 
-            //T = S - thresholdS
-            SimpleMatrix T = (originalImg.minus(L)).minus(S);
+        //T = S - thresholdS
+        SimpleMatrix T = (originalImg.minus(L)).minus(S);
 
-            double normD = originalImg.normF();
-            double normT = T.normF();
+        double normD = originalImg.normF();
+        double normT = T.normF();
 
-            error.set(0, normT / normD);
+        error.set(0, normT / normD);
 
-            int iii = 1;
-            boolean stop = false;
-            double alf = 0;
+        int iii = 1;
+        boolean stop = false;
+        double alf = 0;
 
-            for (int i = 1; i < rankk + 1; i++) {
-                i = i - 1;
-                int rrank = rank;
-                alf = 0;
-                double increment = 1;
+        for (int i = 1; i < rankk + 1; i++) {
+            i = i - 1;
+            int rrank = rank;
+            alf = 0;
+            double increment = 1;
 
-                if (iii == power * (i - 2) + 1) {
-                    iii = iii + power;
+            if (iii == power * (i - 2) + 1) {
+                iii = iii + power;
+            }
+
+            for (int j = 1; j < power + 1; j++) {
+
+                /*
+                 *  X update
+                 */
+
+                //X = abs(L * transposedY)
+                X = (L.mult(Y.transpose()));
+                for (int k = 0; k < X.numCols(); k++) {
+                    for (int l = 0; l < X.numRows(); l++) {
+                        X.set(l, k, Math.abs(X.get(l, k)));
+                    }
                 }
 
-                for (int j = 1; j < power + 1; j++) {
-
-                    /*
-                     *  X update
-                     */
-
-                    //X = abs(L * transposedY)
-                    X = (L.mult(Y.transpose()));
-                    for (int k = 0; k < X.numCols(); k++) {
-                        for (int l = 0; l < X.numRows(); l++) {
-                            X.set(l, k, Math.abs(X.get(l, k)));
-                        }
-                    }
-
-                    /* Do a QR decomposition */
+                /* Do a QR decomposition */
 //                    DenseMatrix64F X2 = X.getMatrix();
 //                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
 //                    qr.decompose(X2);
 //                    qr.getQ(X2, true);
 //                    X = SimpleMatrix.wrap(X2);
 
-                    X = QRFactorisation_Q(X, j);
+                X = QRFactorisation_Q(X, j);
 //
-                    /*
-                     *   Y update
-                     */
-                    //Y = transposedX * L
-                    Y = (X.transpose()).mult(L);
+                /*
+                 *   Y update
+                 */
+                //Y = transposedX * L
+                Y = (X.transpose()).mult(L);
 
-                    //L = X * Y
-                    L = X.mult(Y);
+                //L = X * Y
+                L = X.mult(Y);
 
-                    /*
-                     *  S update
-                     */
-                    //T = originalImg - L
-                    T = originalImg.minus(L);
-                    //thresholding
+                /*
+                 *  S update
+                 */
+                //T = originalImg - L
+                T = originalImg.minus(L);
+                //thresholding
 //                    S = thresholding(T);
-                    S = threshold(T, tau, String.valueOf(mode));
+                S = threshold(T, tau, String.valueOf(mode));
 
-                    // Error, stopping criteria
-                    //T = T - S
-                    T = T.minus(S);
+                // Error, stopping criteria
+                //T = T - S
+                T = T.minus(S);
 
-                    int ii = iii + j - 1;
+                int ii = iii + j - 1;
 
-                    normT = T.normF();
+                normT = T.normF();
 
-                    error.set(ii, normT / normD);
+                error.set(ii, normT / normD);
 
-                    if (error.get(ii) < tol) {
-                        stop = true;
-                        break;
-                    }
-
-                    if (rrank != rank) {
-                        rank = rrank;
-                    }
-
-                    // Adjust alf
-                    double ratio = error.get(ii) / error.get(ii - 1);
-
-                    if (ratio >= 1.1) {
-                        increment = Math.max(0.1 * alf, 0.1 * increment);
-                        error.set(ii, error.get(ii - 1));
-                        alf = 0;
-                    } else if (ratio > 0.7) {
-                        increment = Math.max(increment, 0.25 * alf);
-                        alf = alf + increment;
-                    }
-
-                    /*
-                     *   Update of L
-                     */
-                    //T = (1 + alf) * T
-                    //L = L + T
-                    L = L.plus(T.scale(1 + alf));
-
-                    // Add corest AR
-                    if (j > 8) {
-                        double mean = mean(error, ii - 7, ii);
-                        if (mean > 0.92) {
-                            iii = ii;
-                            int YCol = Y.numCols();
-                            int XRow = X.numRows();
-                            if ((YCol - XRow) >= k) {
-                                Y = Y.extractMatrix(0, XRow - 1, 0, YCol);
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                if (stop) {
+                if (error.get(ii) < tol) {
+                    stop = true;
                     break;
                 }
 
-//            	AR
-                if (i + 1 < rankk) {
-                    Random r = new Random();
-                    SimpleMatrix RR = new SimpleMatrix(k, originalImg.numRows());
-                    for (int x = 0; x < k; x++) {
-                        for (int z = 0; z < originalImg.numRows(); z++) {
-                            RR.set(x, z, r.nextGaussian());
-                            //RR.set(x, z, 1.0);
-                        }
-                    }
-                    //v = RR * L
-                    SimpleMatrix v = RR.mult(L);
-                    //Y = combine(Y, v)
-                    Y = Y.combine(2, 0, v);
+                if (rrank != rank) {
+                    rank = rrank;
                 }
-                i++;
 
+                // Adjust alf
+                double ratio = error.get(ii) / error.get(ii - 1);
+
+                if (ratio >= 1.1) {
+                    increment = Math.max(0.1 * alf, 0.1 * increment);
+                    error.set(ii, error.get(ii - 1));
+                    alf = 0;
+                } else if (ratio > 0.7) {
+                    increment = Math.max(increment, 0.25 * alf);
+                    alf = alf + increment;
+                }
+
+                /*
+                 *   Update of L
+                 */
+                //T = (1 + alf) * T
+                //L = L + T
+                L = L.plus(T.scale(1 + alf));
+
+                // Add corest AR
+                if (j > 8) {
+                    double mean = mean(error, ii - 7, ii);
+                    if (mean > 0.92) {
+                        iii = ii;
+                        int YCol = Y.numCols();
+                        int XRow = X.numRows();
+                        if ((YCol - XRow) >= k) {
+                            Y = Y.extractMatrix(0, XRow - 1, 0, YCol);
+                        }
+                        break;
+                    }
+                }
             }
 
-            //L = X * Y
-            L = X.mult(Y);
-
-            if (originalImg.numRows() > originalImg.numCols()) {
-
-                L = L.transpose();
-                S = S.transpose();
-                originalImg = originalImg.transpose();
+            if (stop) {
+                break;
             }
 
-            /* Noise: G = originalImg - L - S */
+//            	AR
+            if (i + 1 < rankk) {
+                Random r = new Random();
+                SimpleMatrix RR = new SimpleMatrix(k, originalImg.numRows());
+                for (int x = 0; x < k; x++) {
+                    for (int z = 0; z < originalImg.numRows(); z++) {
+                        RR.set(x, z, r.nextGaussian());
+                        //RR.set(x, z, 1.0);
+                    }
+                }
+                //v = RR * L
+                SimpleMatrix v = RR.mult(L);
+                //Y = combine(Y, v)
+                Y = Y.combine(2, 0, v);
+            }
+            i++;
 
-
-            double[][] A2 = matrix2Array2(originalImg);
-            double[][] L2 = matrix2Array2(L);
-            double[][] S2 = matrix2Array2(S);
-            double[][] G2 = matrix2Array2(G);
-
-            ImagePlus original = new ImagePlus(" Original Image ", constructImageStack2(
-                    A2, type));
-            ImagePlus im = new ImagePlus(" Background Image ", constructImageStack2(
-                    L2, type));
-            ImagePlus im2 = new ImagePlus(" Sparse Image ", constructImageStack2(
-                    S2, type));
-            /* Construction du stack d'images pour le bruit (noise) */
-            ImagePlus noise = new ImagePlus("Noise Image", constructImageStack2(G2, type));
-
-
-            im.show();
-            im2.show();
-            original.show();
-            noise.show();		// Affichage du bruit (noise)
-
-            long endTime = System.nanoTime();
-            long duration = endTime - startTime;
-            long durationInMilliseconds = duration / 1000000;
-            double durationInSeconds = duration / 1000000000.0;
-            System.out.println("Execution time in nanoseconds: " + duration);
-            System.out.println("Execution time in milliseconds: " + durationInMilliseconds);
-            System.out.println("Execution time in seconds: " + durationInSeconds);
-            noise.show();		// Affichage du bruit (noise)
-
-            // show the image
-            //ij.ui().show(dataset);
-
-            // invoke the plugin
-            //ij.command().run(GaussFiltering.class, true);
         }
+
+        //L = X * Y
+        L = X.mult(Y);
+
+        if (originalImg.numRows() > originalImg.numCols()) {
+
+            L = L.transpose();
+            S = S.transpose();
+            originalImg = originalImg.transpose();
+        }
+
+        /* Noise: G = originalImg - L - S */
+        SimpleMatrix G = (originalImg.minus(L)).minus(S);
+
+        double[][] A2 = matrix2Array(originalImg);
+        double[][] L2 = matrix2Array(L);
+        double[][] S2 = matrix2Array(S);
+        double[][] G2 = matrix2Array(G);
+
+        ImagePlus original = new ImagePlus(" Original Image ", constructImageStack(
+                A2, type));
+        ImagePlus im = new ImagePlus(" Background Image ", constructImageStack(
+                L2, type));
+        ImagePlus im2 = new ImagePlus(" Sparse Image ", constructImageStack(
+                S2, type));
+        /* Construction du stack d'images pour le bruit (noise) */
+        ImagePlus noise = new ImagePlus("Noise Image", constructImageStack(G2, type));
+
+
+        im.show();
+        im2.show();
+        original.show();
+        noise.show();        // Affichage du bruit (noise)
+
+        long endTime = System.nanoTime();
+        long duration = endTime - startTime;
+        long durationInMilliseconds = duration / 1000000;
+        double durationInSeconds = duration / 1000000000.0;
+        System.out.println("Execution time in nanoseconds: " + duration);
+        System.out.println("Execution time in milliseconds: " + durationInMilliseconds);
+        System.out.println("Execution time in seconds: " + durationInSeconds);
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    public static ImagePlus importImage(File file, int maxFrames) {
-
-        checkFileExtension(file);
-
-        //load image in object
-        ImagePlus imp = IJ.openImage(file.getPath());  // image
+    public static void importImage(ImagePlus imp, int maxFrames) {
 
         int stackSize = imp.getStackSize();
         int ImgHeight = imp.getHeight();
@@ -349,9 +351,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         height = ImgHeight;
         width = ImgWidth;
-
-        return imp;
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void checkFileExtension(File file) {
         String fileExtension = getFileExtension(file);
@@ -363,10 +364,16 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
+    public static String getFileExtension(File file) {
+        String fileName = file.getName();
+        if (fileName.lastIndexOf(".") != -1 && fileName.lastIndexOf(".") != 0)
+            return fileName.substring(fileName.lastIndexOf(".") + 1);
+        else return "";
+    }
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void generateInterface() {
         String[] choice = {"soft", "hard"};
-        d = new GenericDialog("Low Rank and Sparse tool");
-        Button preview = new Button("Preview");
+        GenericDialog d = new GenericDialog("Low Rank and Sparse tool");
         d.addNumericField("tau:", tau, 2);
         d.addChoice("soft or hard thresholding", choice, choice[0]);
         d.showDialog();
@@ -383,38 +390,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    public static String getFileExtension(File file) {
-        String fileName = file.getName();
-        if (fileName.lastIndexOf(".") != -1 && fileName.lastIndexOf(".") != 0)
-            return fileName.substring(fileName.lastIndexOf(".") + 1);
-        else return "";
-    }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double[][][] constructMatrix(ImageStack stack, int bit) {
-        System.out.println(nbSlices);
-        System.out.println(height);
-        System.out.println(width);
-        double[][][] matrix = new double[nbSlices][width][height];
-        if (bit == 8) {
-            for (int z = 0; z < nbSlices; z++) {
-                ByteProcessor bp = (ByteProcessor) stack.getProcessor(z + 1);
-                for (int i = 0; i < width; i++)
-                    for (int j = 0; j < height; j++)
-                        matrix[z][i][j] = bp.getPixelValue(i, j);
-            }
-        }
-        if (bit == 16) {
-            for (int z = 0; z < nbSlices; z++) {
-                ShortProcessor bp = (ShortProcessor) stack.getProcessor(z + 1);
-                for (int i = 0; i < width; i++)
-                    for (int j = 0; j < height; j++)
-                        matrix[z][i][j] = bp.getPixelValue(i, j);
-
-            }
-        }
-        return matrix;
-    }
-
     private static ArrayList<SimpleMatrix> svdDecomposition(SimpleMatrix originalImg) {
         ArrayList<SimpleMatrix> result = new ArrayList<>(3);
 
@@ -473,7 +448,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static SimpleMatrix constructMatrix2(ImageStack stack, int bit) {
+    private static SimpleMatrix constructMatrix(ImageStack stack, int bit) {
         double[][] matrix = new double[nbSlices][width * height];
 
         if (bit == 8) {
@@ -489,24 +464,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return new SimpleMatrix(matrix);
     }
+    /*-----------------------------------------------------------------------------------------------------------------------*/
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ImageStack constructImageStack(double[][][] matrix, int bit) {
-        ImageStack newStack = new ImageStack(width, height);
-        for (int z = 0; z < nbSlices; z++) {
-            ByteProcessor bp = new ByteProcessor(width, height);
-
-            for (int i = 0; i < width; i++)
-                for (int j = 0; j < height; j++)
-                    bp.putPixel(i, j, (int) matrix[z][i][j]);
-            newStack.addSlice(bp);
-        }
-
-        return newStack;
-    }
-
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ImageStack constructImageStack2(double[][] matrix, int bit) {
+    private static ImageStack constructImageStack(double[][] matrix, int bit) {
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
 
@@ -553,23 +514,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ImageStack constructImageStack3(double[][] matrix, int bit) {
-        ImageStack newStack = new ImageStack(width, height);
-        for (int z = 0; z < nbSlices; z++) {
-            byte[] pixels = new byte[width * height];
-            for (int i = 0; i < pixels.length; i++) {
-                pixels[i] = (byte) (matrix[z][i] + 0.5);
-            }
-            ByteProcessor bp = new ByteProcessor(width, height, pixels);
-
-            newStack.addSlice("slice " + (z + 1), bp);
-        }
-
-        return newStack;
-    }
-
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double[][] matrix2Array2(SimpleMatrix matrix) {
+    private static double[][] matrix2Array(SimpleMatrix matrix) {
         double[][] array = new double[matrix.numRows()][matrix.numCols()];
         for (int r = 0; r < matrix.numRows(); r++) {
             for (int c = 0; c < matrix.numCols(); c++) {
@@ -578,24 +523,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         }
         return array;
     }
-
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static SimpleMatrix thresholding(SimpleMatrix S) {
-        for (int i = 0; i < S.numRows(); i++) {
-            for (int j = 0; j < S.numCols(); j++) {
-                double val = S.get(i, j);
-                if (val > tau) {
-                    S.set(i, j, val - tau);
-                } else if (val < -tau) {
-                    S.set(i, j, val + tau);
-                } else {
-                    S.set(i, j, 0);
-                }
-            }
-        }
-        return S;
-    }
-
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static SimpleMatrix threshold(SimpleMatrix data, double tau, String mode) {
         int rows = data.numRows();
@@ -643,30 +570,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         return sum / count;
     }
 
-    private static double[][][] matrix2Array(SimpleMatrix matrix) {
-        double[][][] array = new double[nbSlices][width][height];
-        for (int r = 0; r < matrix.numRows(); r++) {
-            for (int c = 0; c < matrix.numCols(); c++) {
-                int row = (c % (width * height)) / height;
-                int col = (c % (width * height)) % height;
-                array[r][row][col] = matrix.get(r, c);
-            }
-        }
-        return array;
-    }
-
-    private static double[][][] matrix2Array3(SimpleMatrix matrix) {
-        double[][][] array = new double[nbSlices][width][height];
-        for (int r = 0; r < matrix.numRows(); r++) {
-            for (int c = 0; c < matrix.numCols(); c++) {
-                int row = (c % (width * height)) / height;
-                int col = (c % (width * height)) % height;
-                array[r][row][col] = matrix.get(r, c);
-            }
-        }
-        return array;
-    }
-
     private static SimpleMatrix QRFactorisation_Q(SimpleMatrix matrix, int negatif) {
         if (matrix.numRows() < matrix.numCols()) {
             System.out.println("Il doit y avoir plus de lignes que de colonnes");
@@ -705,11 +608,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         return Q;
 
     }
-
-
-
-
-    private enum MODE {SOFT, HARD;}
 
 }
 /*-----------------------------------------------------------------------------------------------------------------------*/
