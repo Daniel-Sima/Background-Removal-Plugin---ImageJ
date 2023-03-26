@@ -8,9 +8,9 @@
 
 package com.mycompany.imagej;
 
-import cern.colt.matrix.DoubleMatrix2D;
-import cern.colt.matrix.impl.DenseDoubleMatrix2D;
-import cern.colt.matrix.linalg.QRDecomposition;
+import Jama.Matrix;
+import Jama.QRDecomposition;
+import Jama.SingularValueDecomposition;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -22,6 +22,9 @@ import net.imagej.Dataset;
 import net.imagej.ImageJ;
 import net.imagej.ops.OpService;
 import net.imglib2.type.numeric.RealType;
+import org.ejml.data.DenseMatrix64F;
+import org.ejml.factory.DecompositionFactory;
+import org.ejml.ops.CommonOps;
 import org.ejml.simple.SimpleMatrix;
 import org.ejml.simple.SimpleSVD;
 import org.scijava.command.Command;
@@ -117,9 +120,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void execute() {
-        ImagePlus imp = IJ.getImage();
-        importImage(imp, 0);
-        process(imp);
+//        ImagePlus imp = IJ.getImage();
+//        importImage(imp, 0);
+//        process(imp);
+        generateInterface();
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void process(ImagePlus imp) {
@@ -214,6 +218,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //                    qr.decompose(X2);
 //                    qr.getQ(X2, true);
 //                    X = SimpleMatrix.wrap(X2);
+
 
                 X = QRFactorisation_Q(X, j);
 //
@@ -555,25 +560,25 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         SimpleMatrix Y = A.mult(R);
 
         // Etape 3: Effectuer une decomposition QR sur la matrice Y
-        // Convert SimpleMatrix to DoubleMatrix2D
+        // Convert SimpleMatrix to Matrix
         double[][] data = new double[Y.numRows()][Y.numCols()];
         for (int i = 0; i < Y.numRows(); i++) {
             for (int j = 0; j < Y.numCols(); j++) {
                 data[i][j] = Y.get(i, j);
             }
         }
-        DoubleMatrix2D temp = new DenseDoubleMatrix2D(data);
-        QRDecomposition qr = new QRDecomposition(temp);
-        DoubleMatrix2D Qs = qr.getQ();
-        SimpleMatrix Q = new SimpleMatrix(Qs.toArray());
+        Matrix temp = new Matrix(data);
 
+        // Compute QR decomposition
+        QRDecomposition qr = new QRDecomposition(temp);
+        Matrix Qs = qr.getQ();
+        SimpleMatrix Q = new SimpleMatrix(Qs.getArray());
 
         // Etape 4: Calculer la matrice B = Q^T * A
         SimpleMatrix B = Q.transpose().mult(A);
 
         // Etape 5: Appliquer la SVD sur la matrice B
         SimpleSVD svd = B.svd(true);
-
 
         SimpleMatrix U = svd.getU();
         SimpleMatrix S = svd.getW();
