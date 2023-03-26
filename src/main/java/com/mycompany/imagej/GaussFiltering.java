@@ -59,12 +59,12 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     //
     // Feel free to add more parameters here...
     //
-    @Parameter
-    private Dataset currentData;
-    @Parameter
-    private UIService uiService;
-    @Parameter
-    private OpService opService;
+//    @Parameter
+//    private Dataset currentData;
+//    @Parameter
+//    private UIService uiService;
+//    @Parameter
+//    private OpService opService;
     @Override
     public void run() {
         execute();
