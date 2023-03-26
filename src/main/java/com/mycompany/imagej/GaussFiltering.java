@@ -8,6 +8,9 @@
 
 package com.mycompany.imagej;
 
+import cern.colt.matrix.DoubleMatrix2D;
+import cern.colt.matrix.impl.DenseDoubleMatrix2D;
+import cern.colt.matrix.linalg.QRDecomposition;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -143,11 +146,15 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
          * Y = Unitary matrix having right singular vectors as rows.
          * s = Diagonal matrix with singular values.
          */
-        ArrayList<SimpleMatrix> svdResult = svdDecomposition(originalImg);
+        //ArrayList<SimpleMatrix> svdResult = svdDecomposition(originalImg);
+        ArrayList<SimpleMatrix> svdResult = randomizedSVD(originalImg, k);
 
         SimpleMatrix X = svdResult.get(0);
         SimpleMatrix Y = svdResult.get(1);
         SimpleMatrix s = svdResult.get(2);
+
+        System.gc(); // appel du arbage collector
+        Runtime.getRuntime().gc();
 
         // X = X * s
         X = X.mult(s);
@@ -531,6 +538,55 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         SimpleMatrix s = SimpleMatrix.diag(valS);
         result.add(s);
 
+        return result;
+    }
+
+    public static ArrayList<SimpleMatrix> randomizedSVD(SimpleMatrix A, int k) {
+
+        ArrayList<SimpleMatrix> result = new ArrayList<>(3);
+        int n = A.numCols();
+
+        // Etape 1: Generer une matrice aleatoire R de taille n x k
+        SimpleMatrix R =
+                SimpleMatrix.random(n, k, 0, 1, new java.util.Random()); // imperativement aleatoire entre 0 et 1
+
+
+        // Etape 2: Calculer le produit matriciel Y = A * R
+        SimpleMatrix Y = A.mult(R);
+
+        // Etape 3: Effectuer une decomposition QR sur la matrice Y
+        // Convert SimpleMatrix to DoubleMatrix2D
+        double[][] data = new double[Y.numRows()][Y.numCols()];
+        for (int i = 0; i < Y.numRows(); i++) {
+            for (int j = 0; j < Y.numCols(); j++) {
+                data[i][j] = Y.get(i, j);
+            }
+        }
+        DoubleMatrix2D temp = new DenseDoubleMatrix2D(data);
+        QRDecomposition qr = new QRDecomposition(temp);
+        DoubleMatrix2D Qs = qr.getQ();
+        SimpleMatrix Q = new SimpleMatrix(Qs.toArray());
+
+
+        // Etape 4: Calculer la matrice B = Q^T * A
+        SimpleMatrix B = Q.transpose().mult(A);
+
+        // Etape 5: Appliquer la SVD sur la matrice B
+        SimpleSVD svd = B.svd(true);
+
+
+        SimpleMatrix U = svd.getU();
+        SimpleMatrix S = svd.getW();
+        SimpleMatrix V = svd.getV();
+
+        // Etape 6: Calculer la matrice U de la decomposition en valeurs singulieres
+        // tronquees de la matrice d'entree A
+        SimpleMatrix Us = Q.mult(U);
+
+        // Renvoyer les matrices U, S et V de la Truncated SVD
+        result.add(Us);
+        result.add(V.transpose());
+        result.add(S);
         return result;
     }
 
