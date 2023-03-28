@@ -80,10 +80,15 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
      */
     private static JFrame frame;
 
-    private static ImagePlus imp;
+    private static JButton chooseFileButton;
+    private static JLabel pathLabel;
+    private static JPanel originalImagePanel;
+    private static JPanel backgroundImagePanel;
+    private static JPanel sparseImagePanel;
+    private static JPanel noiseImagePanel;
+    private static JPanel previewPanel;
 
-    static JButton chooseFileButton;
-    static JLabel pathLabel;
+    private static ImagePlus imp;
     JButton previewButton;
     static Color[] presetColors = { new Color(255,255,255), new Color(192,192,192), new Color(213,170,213), new Color(170,170,255), new Color(170,213,255), new Color(170,213,170),new Color(255,255,170), new Color(250,224,175), new Color(255,170,170) };
     static Color bgColor;
@@ -96,33 +101,10 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
     private enum MODE {SOFT, HARD;}
     private static int height, width, nbSlices, nbSlicesPreview, type, dynamicRange = 8;
     public static void main(final String... args) throws Exception {
-
-        // create the ImageJ application context with all available services
-        final ImageJ ij = new ImageJ();
-
-        // affiche l'interface utilisateur pour acceder aux functionnalites
-        //ij.ui().showUI();
-
-        // for the future
-        /*  ask the user for a file to open */
-        //final File file = ij.ui().chooseFile(null, "open");
-        generateInterface();
-
-//        if (file != null) {
-//            checkFileExtension(file);
-//
-//            //load image in object
-//            ImagePlus imp = IJ.openImage(file.getPath());  // image
-//            importImage(imp, 0);
-//
-//            process(imp);
-//        }
+         execute();
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void execute() {
-//        ImagePlus imp = IJ.getImage();
-//        importImage(imp, 0);
-//        process(imp);
         generateInterface();
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
@@ -334,8 +316,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         double[][] S2 = matrix2Array(S);
         double[][] G2 = matrix2Array(G);
 
-        ImagePlus original = new ImagePlus(" Original Image ", constructImageStack(
-                A2, type));
+//        ImagePlus original = new ImagePlus(" Original Image ", constructImageStack(
+//                A2, type));
         ImagePlus im = new ImagePlus(" Background Image ", constructImageStack(
                 L2, type));
         ImagePlus im2 = new ImagePlus(" Sparse Image ", constructImageStack(
@@ -343,12 +325,19 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
         /* Construction du stack d'images pour le bruit (noise) */
         ImagePlus noise = new ImagePlus("Noise Image", constructImageStack(G2, type));
 
-        JPanel panel = createPreviewWindow(im);
-        panel.setMaximumSize(new Dimension(200, 200));
-        JPanel panel2 = createPreviewWindow(im2);
-        panel2.setMaximumSize(new Dimension(200, 200));
-        frame.add(panel, BorderLayout.SOUTH);
-        frame.add(panel2, BorderLayout.SOUTH);
+
+        int index = previewPanel.getComponentZOrder(backgroundImagePanel);
+        previewPanel.remove(backgroundImagePanel);
+        backgroundImagePanel = MyGUI.createPreviewWindow(im);
+        previewPanel.add(backgroundImagePanel, index);
+
+        index = previewPanel.getComponentZOrder(sparseImagePanel);
+        previewPanel.remove(sparseImagePanel);
+        sparseImagePanel = MyGUI.createPreviewWindow(im2);
+        previewPanel.add(sparseImagePanel, index);
+
+        previewPanel.revalidate();
+        previewPanel.repaint();
 
 
 //        im.show();
@@ -428,47 +417,64 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
         // Create a JFrame and add the JScrollPane to it
         frame = new JFrame("TIFF Stack Preview");
-        frame.setSize(800, 600);
+        frame.setSize(1100, 750);
         frame.setLocationRelativeTo(null); // Center frame on screen
-        frame.setLayout(new FlowLayout());
-        JPanel previewPanel = new JPanel();
-        //TODO: set size limit for previewPanel
-//        previewPanel.setMaximumSize(new Dimension(400, 400));
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 1));
-        buttonPanel.setMaximumSize(new Dimension(200, 200));
-        chooseFileButton = new JButton("Choose File");
+        //frame.setLayout(new FlowLayout());
+
+        JPanel mainLayout = new JPanel();
+        mainLayout.setPreferredSize(frame.getPreferredSize());
+
+        JPanel loadFilePanel = createFileButton();
+        mainLayout.add(loadFilePanel);
+
+        previewPanel = getRowPanel();
+
+        // Load the spinner loading GIF
+        ImageIcon loadingIcon = new ImageIcon("src/main/resources/icons/loading.gif");
+
+        // Create the label with the icon
+        JLabel loadingLabel = new JLabel(loadingIcon);
+        JLabel loadingLabel2 = new JLabel(loadingIcon);
+
         chooseFileButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 // Handle choose file button click
                 FileDialog fd = new FileDialog(frame, "Choose Image", FileDialog.LOAD);
                 fd.setVisible(true);
                 String path = fd.getDirectory() + fd.getFile();
-                pathLabel.setMaximumSize(new Dimension(200, pathLabel.getPreferredSize().height));
+                //pathLabel.setMaximumSize(new Dimension(200, pathLabel.getPreferredSize().height));
                 pathLabel.setText(fd.getFile()); // Update path label text
 
                 //TODO:check extension
                 imp = IJ.openImage(path);
                 importImage(imp, 0);
-                process(imp);
-                JPanel panel = createPreviewWindow(imp);
-                previewPanel.removeAll();
-                previewPanel.add(panel);
+
+                int index = previewPanel.getComponentZOrder(originalImagePanel);
+                previewPanel.remove(originalImagePanel);
+                originalImagePanel = MyGUI.createPreviewWindow(imp);
+                previewPanel.add(originalImagePanel, index);
+
+                backgroundImagePanel.add(loadingLabel);
+                sparseImagePanel.add(loadingLabel2);
+
                 previewPanel.revalidate();
                 previewPanel.repaint();
-                // Do something with selected file
+
+                SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
+                    @Override
+                    protected Void doInBackground() throws Exception {
+                        GaussFiltering.process(imp);
+                        return null;
+                    }
+                };
+                worker.execute();
             }
         });
-        buttonPanel.add(chooseFileButton);
-
-        pathLabel = new JLabel("No file selected");
-        pathLabel.setMaximumSize(new Dimension(50, pathLabel.getPreferredSize().height));
-        pathLabel.setHorizontalAlignment(JLabel.LEFT);
+        mainLayout.add(previewPanel);
 
         frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
-        frame.add(pathLabel, BorderLayout.SOUTH);
-        frame.add(buttonPanel, BorderLayout.CENTER);
-
-        frame.add(previewPanel, BorderLayout.SOUTH);
+        frame.add(mainLayout, BorderLayout.CENTER);
+        //frame.add(previewPanel, BorderLayout.SOUTH);
 
         bgColor=presetColors[0];
         frame.setBackground(bgColor);
@@ -486,6 +492,61 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //                e.printStackTrace();
 //            }
 //        }
+    }
+
+    protected static JPanel getRowPanel()
+    {
+        JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+
+        originalImagePanel = new JPanel();
+        originalImagePanel.setPreferredSize(new Dimension(300, 300));
+        originalImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        backgroundImagePanel = new JPanel();
+        backgroundImagePanel.setPreferredSize(new Dimension(300, 300));
+        backgroundImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        sparseImagePanel = new JPanel();
+        sparseImagePanel.setPreferredSize(new Dimension(300, 300));
+        sparseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        rowPanel.add(originalImagePanel);
+        rowPanel.add(Box.createHorizontalStrut(50));
+        rowPanel.add(backgroundImagePanel);
+        rowPanel.add(Box.createHorizontalStrut(50));
+        rowPanel.add(sparseImagePanel);
+
+        return rowPanel;
+    }
+
+    protected static JPanel createFileButton()
+    {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        panel.setPreferredSize(new Dimension(frame.getWidth()-200, 30));
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setPreferredSize(new Dimension((int)(0.2 * panel.getPreferredSize().getWidth()), (int) panel.getPreferredSize().getHeight()));
+        buttonPanel.setLayout(new BorderLayout());
+
+        chooseFileButton = new JButton("Choose File");
+        chooseFileButton.setPreferredSize(new Dimension(400, 30));
+
+        buttonPanel.add(chooseFileButton, BorderLayout.CENTER);
+
+        pathLabel = new JLabel("No file selected");
+        pathLabel.setPreferredSize(new Dimension((int)(0.5 * panel.getPreferredSize().getWidth()), pathLabel.getPreferredSize().height));
+        pathLabel.setHorizontalAlignment(JLabel.LEFT);
+
+        JPanel labelPanel = new JPanel();
+        labelPanel.setPreferredSize(new Dimension((int)(0.5 * panel.getPreferredSize().getWidth()), (int) panel.getPreferredSize().getHeight()));
+        labelPanel.setLayout(new BorderLayout());
+        labelPanel.add(pathLabel, BorderLayout.CENTER);
+
+        panel.add(buttonPanel);
+        panel.add(Box.createHorizontalStrut(50));
+        panel.add(labelPanel);
+
+        return panel;
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
     private static ArrayList<SimpleMatrix> svdDecomposition(SimpleMatrix originalImg) {
@@ -757,87 +818,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
     }
 
-    protected static JPanel createPreviewWindow(ImagePlus imp)
-    {
-        if(imp != null){
-            // Get the number of frames in the TIFF stack
-            int numFrames = imp.getStackSize();
 
-            // Create a custom Canvas to display the preview
-            StackCanvas canvas = new StackCanvas(imp);
-
-            // Create a JScrollPane to add scrolling capabilities to the canvas
-            JScrollPane scrollPane = new JScrollPane(canvas);
-            scrollPane.setMaximumSize(new Dimension(250, 250));
-
-            // Create a JSlider to slide frames manually
-            JSlider slider = new JSlider(1, numFrames, 1);
-            slider.setMajorTickSpacing(10);
-            slider.setMinorTickSpacing(1);
-            slider.setPaintTicks(true);
-            slider.setPaintLabels(true);
-            slider.addChangeListener(new ChangeListener() {
-                @Override
-                public void stateChanged(ChangeEvent e) {
-                    int slice = slider.getValue();
-                    imp.setSlice(slice);
-                    canvas.repaint();
-                }
-            });
-
-            JPanel panel = new JPanel(new GridLayout(2, 1));
-            panel.removeAll();
-            panel.add(scrollPane);
-            panel.add(slider);
-            panel.revalidate();
-            panel.repaint();
-
-            return panel;
-        }
-
-
-//        frame.add(scrollPane);
-//        frame.add(slider, "South");
-        return null;
-    }
-
-    private static class StackCanvas extends Canvas {
-        private static final long serialVersionUID = 1L;
-
-        private final ImagePlus imp;
-        private final int imageWidth;
-        private final int imageHeight;
-
-        public StackCanvas(ImagePlus imp) {
-            this.imp = imp;
-            this.imageWidth = imp.getWidth();
-            this.imageHeight = imp.getHeight();
-            setPreferredSize(new Dimension(imageWidth, imageHeight));
-        }
-
-        @Override
-        public void paint(Graphics g) {
-
-            // Create off-screen buffer
-            Image offscreen = createImage(getWidth(), getHeight());
-            Graphics buffer = offscreen.getGraphics();
-
-            // Get the current slice and the corresponding image processor
-            int slice = imp.getCurrentSlice();
-            FileInfo fi = imp.getFileInfo();
-            BufferedImage img = imp.getStack().getProcessor(slice).getBufferedImage();
-
-            // Draw the image on the off-screen buffer
-            buffer.drawImage(img, 0, 0, null);
-
-            // Draw the slice number and file name in the bottom-left corner
-            String sliceText = "Slice: " + slice + "/" + imp.getStackSize();
-            buffer.drawString(sliceText, 10, getHeight() - 10);
-
-            // Swap the buffers
-            g.drawImage(offscreen, 0, 0, null);
-        }
-    }
 }
 /*-----------------------------------------------------------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------------------------------------------*/
