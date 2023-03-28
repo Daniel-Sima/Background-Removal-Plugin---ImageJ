@@ -175,75 +175,8 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //        }
 
         // Create a JFrame and add the JScrollPane to it
-        frame = new JFrame("TIFF Stack Preview");
-        frame.setSize(1100, 750);
-        frame.setLocationRelativeTo(null); // Center frame on screen
-        //frame.setLayout(new FlowLayout());
+        frame = MyGUI.getGUIFrame();
 
-        JPanel mainLayout = new JPanel();
-        mainLayout.setPreferredSize(frame.getPreferredSize());
-
-        JPanel loadFilePanel = createFileButton();
-        mainLayout.add(loadFilePanel);
-
-        previewPanel = getRowPanel();
-
-        // Load the spinner loading GIF
-        ImageIcon loadingIcon = new ImageIcon(GaussFiltering.class.getResource("/icons/loading.gif"));
-
-        // Create the label with the icon
-        JLabel loadingLabel = new JLabel(loadingIcon);
-        JLabel loadingLabel2 = new JLabel(loadingIcon);
-
-        JButton previewButton = new JButton("Preview");
-        previewButton.setPreferredSize(new Dimension(200, 30));
-
-        previewButtonActionListener =
-                new MyGUI.PreviewButtonActionListener(previewPanel, backgroundImagePanel, sparseImagePanel, loadingLabel, loadingLabel2);
-
-        chooseFileButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                // Handle choose file button click
-                FileDialog fd = new FileDialog(frame, "Choose Image", FileDialog.LOAD);
-                fd.setVisible(true);
-                String path = fd.getDirectory() + fd.getFile();
-                //pathLabel.setMaximumSize(new Dimension(200, pathLabel.getPreferredSize().height));
-                pathLabel.setText(fd.getFile()); // Update path label text
-
-                //TODO:check extension
-                imp = IJ.openImage(path);
-
-                ImageProcess processor = importImage(imp, 0);
-
-                int index = previewPanel.getComponentZOrder(originalImagePanel);
-                previewPanel.remove(originalImagePanel);
-                originalImagePanel = MyGUI.createPreviewWindow(imp);
-                previewPanel.add(originalImagePanel, index);
-
-                previewPanel.revalidate();
-                previewPanel.repaint();
-
-                processor.setPreviewPanel(previewPanel);
-                processor.setBackgroundImagePanel(backgroundImagePanel);
-                processor.setSparseImagePanel(sparseImagePanel);
-
-                previewButtonActionListener.setImp(imp);
-                previewButtonActionListener.setImageProcessor(processor);
-            }
-        });
-
-
-        previewButton.addActionListener(previewButtonActionListener);
-
-        mainLayout.add(previewPanel);
-        mainLayout.add(previewButton);
-
-        frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
-        frame.add(mainLayout, BorderLayout.CENTER);
-        //frame.add(previewPanel, BorderLayout.SOUTH);
-
-        bgColor=presetColors[0];
-        frame.setBackground(bgColor);
 
         //frame.pack();
         frame.setVisible(true);
