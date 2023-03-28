@@ -11,9 +11,186 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
+import java.util.Objects;
 
 public class MyGUI {
 
+    private static JFrame frame;
+    private static JPanel previewPanel;
+    private static JPanel originalImagePanel;
+    private static JPanel backgroundImagePanel;
+    private static JLabel loadingBackgroundLabel;
+    private static JLabel loadingSparseLabel;
+    private static JLabel loadingNoiseLabel;
+    private static JPanel sparseImagePanel;
+    private static JButton chooseFileButton;
+    private static JLabel pathLabel;
+    private static ImagePlus imp;
+    private static ImageProcess processor;
+    static Color[] presetColors = { new Color(255,255,255), new Color(192,192,192), new Color(213,170,213), new Color(170,170,255), new Color(170,213,255), new Color(170,213,170),new Color(255,255,170), new Color(250,224,175), new Color(255,170,170) };
+    static Color bgColor;
+
+    public static void importImage(ImagePlus imp, int maxFrames) {
+
+        int stackSize = imp.getStackSize();
+        int ImgHeight = imp.getHeight();
+        int ImgWidth = imp.getWidth();
+        int dynamicRange = 0;
+        int nbSlices = stackSize;
+
+        // FIXME probleme s'il y a qu'une seule frame ?
+        if (imp.getStackSize() < 2) {
+            IJ.error("Stack required");
+            throw new RuntimeException("Stack required");
+        } else {
+            nbSlices = maxFrames == 0 ? stackSize : maxFrames;
+            if (imp.getType() == ImagePlus.GRAY8) {
+                dynamicRange = 8;
+            } else if (imp.getType() == ImagePlus.GRAY16) dynamicRange = 16;
+            else {
+                IJ.error("Image type not supported ( only GRAY8 and GRAY16 )");
+            }
+        }
+
+        processor.setDynamicRange(dynamicRange);
+        processor.setWidth(ImgWidth);
+        processor.setHeight(ImgHeight);
+        processor.setStackSize(nbSlices);
+        processor.setOriginalStackSize(stackSize);
+
+    }
+//    protected static JFrame getGUIFrame()
+//    {
+//        processor = new ImageProcess();
+//        // Create a JFrame and add the JScrollPane to it
+//        frame = new JFrame("TIFF Stack Preview");
+//        frame.setSize(1100, 750);
+//        frame.setLocationRelativeTo(null); // Center frame on screen
+//        //frame.setLayout(new FlowLayout());
+//
+//        JPanel mainLayout = new JPanel();
+//        mainLayout.setPreferredSize(frame.getPreferredSize());
+//
+//        JPanel loadFilePanel = createFileButton();
+//        mainLayout.add(loadFilePanel);
+//
+//        previewPanel = getRowPanel();
+//
+//        // Load the spinner loading GIF
+//        ImageIcon loadingIcon = new ImageIcon(Objects.requireNonNull(GaussFiltering.class.getResource("/icons/loading.gif")));
+//
+//        // Create the label with the icon
+//        loadingBackgroundLabel = new JLabel(loadingIcon);
+//        loadingSparseLabel = new JLabel(loadingIcon);
+//
+//        JButton previewButton = new JButton("Preview");
+//        previewButton.setPreferredSize(new Dimension(200, 30));
+//
+//        PreviewButtonActionListener previewButtonActionListener = new PreviewButtonActionListener(previewPanel, backgroundImagePanel);
+//
+//        //processor = new ImageProcess(previewPanel, backgroundImagePanel, sparseImagePanel);
+//        chooseFileButton.addActionListener(new ActionListener() {
+//            public void actionPerformed(ActionEvent e) {
+//                // Handle choose file button click
+//                FileDialog fd = new FileDialog(frame, "Choose Image", FileDialog.LOAD);
+//                fd.setVisible(true);
+//                String path = fd.getDirectory() + fd.getFile();
+//                //pathLabel.setMaximumSize(new Dimension(200, pathLabel.getPreferredSize().height));
+//                pathLabel.setText(fd.getFile()); // Update path label text
+//
+//                //TODO:check extension
+//                imp = IJ.openImage(path);
+//
+//                importImage(imp, 0);
+//
+//                int index = previewPanel.getComponentZOrder(originalImagePanel);
+//                previewPanel.remove(originalImagePanel);
+//                originalImagePanel = MyGUI.createPreviewWindow(imp);
+//                previewPanel.add(originalImagePanel, index);
+//
+//                previewPanel.revalidate();
+//                previewPanel.repaint();
+//
+//                processor.setPreviewPanel(previewPanel);
+//                processor.setBackgroundImagePanel(backgroundImagePanel);
+//                processor.setSparseImagePanel(sparseImagePanel);
+//
+//                previewButtonActionListener.setImp(imp);
+//                previewButtonActionListener.setImageProcessor(processor);
+//            }
+//        });
+//
+//        previewButton.addActionListener(previewButtonActionListener);
+//
+//        mainLayout.add(previewPanel);
+//        mainLayout.add(previewButton);
+//
+//        frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
+//        frame.add(mainLayout, BorderLayout.CENTER);
+//        //frame.add(previewPanel, BorderLayout.SOUTH);
+//
+//        bgColor=presetColors[0];
+//        frame.setBackground(bgColor);
+//
+//        return frame;
+//    }
+
+    protected static JPanel getRowPanel()
+    {
+        JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+
+        originalImagePanel = new JPanel();
+        originalImagePanel.setPreferredSize(new Dimension(300, 300));
+        originalImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        backgroundImagePanel = new JPanel();
+        backgroundImagePanel.setPreferredSize(new Dimension(300, 300));
+        backgroundImagePanel.setLayout(new BorderLayout());
+        backgroundImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        sparseImagePanel = new JPanel();
+        sparseImagePanel.setPreferredSize(new Dimension(300, 300));
+        sparseImagePanel.setLayout(new BorderLayout());
+        sparseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        rowPanel.add(originalImagePanel);
+        rowPanel.add(Box.createHorizontalStrut(50));
+        rowPanel.add(backgroundImagePanel);
+        rowPanel.add(Box.createHorizontalStrut(50));
+        rowPanel.add(sparseImagePanel);
+
+        return rowPanel;
+    }
+
+    protected static JPanel createFileButton()
+    {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        panel.setPreferredSize(new Dimension(frame.getWidth()-200, 30));
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setPreferredSize(new Dimension((int)(0.2 * panel.getPreferredSize().getWidth()), (int) panel.getPreferredSize().getHeight()));
+        buttonPanel.setLayout(new BorderLayout());
+
+        chooseFileButton = new JButton("Choose File");
+        chooseFileButton.setPreferredSize(new Dimension(400, 30));
+
+        buttonPanel.add(chooseFileButton, BorderLayout.CENTER);
+
+        pathLabel = new JLabel("No file selected");
+        pathLabel.setPreferredSize(new Dimension((int)(0.5 * panel.getPreferredSize().getWidth()), pathLabel.getPreferredSize().height));
+        pathLabel.setHorizontalAlignment(JLabel.LEFT);
+
+        JPanel labelPanel = new JPanel();
+        labelPanel.setPreferredSize(new Dimension((int)(0.5 * panel.getPreferredSize().getWidth()), (int) panel.getPreferredSize().getHeight()));
+        labelPanel.setLayout(new BorderLayout());
+        labelPanel.add(pathLabel, BorderLayout.CENTER);
+
+        panel.add(buttonPanel);
+        panel.add(Box.createHorizontalStrut(50));
+        panel.add(labelPanel);
+
+        return panel;
+    }
 
     protected static JPanel createPreviewWindow(ImagePlus imp)
     {
@@ -120,6 +297,58 @@ public class MyGUI {
 
             // Swap the buffers
             g.drawImage(offscreen, 0, 0, getWidth(), getHeight(),null);
+        }
+    }
+
+    public static class PreviewButtonActionListener implements ActionListener {
+        private JPanel previewPanel;
+        private JPanel backgroundImagePanel;
+        private JPanel sparseImagePanel;
+        private JLabel loadingLabel;
+        private JLabel loadingLabel2;
+        private ImagePlus imp;
+        private ImageProcess processor;
+
+        public PreviewButtonActionListener(
+                JPanel previewPanel,
+                JPanel backgroundImagePanel,
+                JPanel sparseImagePanel,
+                JLabel loadingLabel,
+                JLabel loadingLabel2
+        ) {
+            this.previewPanel = previewPanel;
+            this.backgroundImagePanel = backgroundImagePanel;
+            this.sparseImagePanel = sparseImagePanel;
+            this.loadingLabel = loadingLabel;
+            this.loadingLabel2 = loadingLabel2;
+            this.processor = new ImageProcess();
+        }
+
+        public void setImp(ImagePlus imp)
+        {
+            this.imp = imp;
+        }
+
+        public void setImageProcessor(ImageProcess processor)
+        {
+            this.processor = processor;
+        }
+
+        public void actionPerformed(ActionEvent e) {
+            backgroundImagePanel.add(loadingLabel, BorderLayout.CENTER);
+            sparseImagePanel.add(loadingLabel2, BorderLayout.CENTER);
+
+            previewPanel.revalidate();
+            previewPanel.repaint();
+            SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
+                @Override
+                protected Void doInBackground() throws Exception {
+                    processor.setStackSize(100);
+                    processor.process(imp);
+                    return null;
+                }
+            };
+            worker.execute();
         }
     }
 }
