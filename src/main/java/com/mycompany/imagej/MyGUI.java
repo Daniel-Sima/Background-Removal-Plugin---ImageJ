@@ -27,8 +27,9 @@ public class MyGUI {
     private static JLabel pathLabel;
     private static ImagePlus imp;
     private static ImageProcess processor;
-    static Color[] presetColors = { new Color(255,255,255), new Color(192,192,192), new Color(213,170,213), new Color(170,170,255), new Color(170,213,255), new Color(170,213,170),new Color(255,255,170), new Color(250,224,175), new Color(255,170,170) };
-    static Color bgColor;
+    private static Color[] presetColors = { new Color(255,255,255), new Color(192,192,192), new Color(213,170,213), new Color(170,170,255), new Color(170,213,255), new Color(170,213,170),new Color(255,255,170), new Color(250,224,175), new Color(255,170,170) };
+    private static Color bgColor;
+    private static int nbSlicesPreview;
 
     public static void importImage(ImagePlus imp, int maxFrames) {
 
@@ -36,7 +37,7 @@ public class MyGUI {
         int ImgHeight = imp.getHeight();
         int ImgWidth = imp.getWidth();
         int dynamicRange = 0;
-        int nbSlices = stackSize;
+        int nbSlices;
 
         // FIXME probleme s'il y a qu'une seule frame ?
         if (imp.getStackSize() < 2) {
@@ -44,6 +45,7 @@ public class MyGUI {
             throw new RuntimeException("Stack required");
         } else {
             nbSlices = maxFrames == 0 ? stackSize : maxFrames;
+            nbSlicesPreview = Math.min(stackSize, 100);
             if (imp.getType() == ImagePlus.GRAY8) {
                 dynamicRange = 8;
             } else if (imp.getType() == ImagePlus.GRAY16) dynamicRange = 16;
@@ -89,7 +91,7 @@ public class MyGUI {
         JButton previewButton = new JButton("Preview");
         previewButton.setPreferredSize(new Dimension(200, 30));
 
-        PreviewButtonActionListener previewButtonActionListener = new PreviewButtonActionListener();
+        PreviewButtonActionListener previewButtonActionListener = new PreviewButtonActionListener(previewPanel, backgroundImagePanel);
 
         //processor = new ImageProcess(previewPanel, backgroundImagePanel, sparseImagePanel);
         chooseFileButton.addActionListener(new ActionListener() {
@@ -300,10 +302,14 @@ public class MyGUI {
     }
 
     public static class PreviewButtonActionListener implements ActionListener {
+        private JPanel backgroundImagePanel;
+        private final JPanel previewPanel;
         private ImagePlus imp;
         private ImageProcess processor;
 
-        public PreviewButtonActionListener() {
+        public PreviewButtonActionListener(JPanel previewPanel, JPanel backgroundImagePanel) {
+            this.backgroundImagePanel = backgroundImagePanel;
+            this.previewPanel = previewPanel;
 //            this.processor = new ImageProcess();
         }
 
@@ -318,15 +324,24 @@ public class MyGUI {
         }
 
         public void actionPerformed(ActionEvent e) {
+
+            backgroundImagePanel.removeAll();
             backgroundImagePanel.add(loadingBackgroundLabel, BorderLayout.CENTER);
+            backgroundImagePanel.revalidate();
+            backgroundImagePanel.repaint();
+
+            sparseImagePanel.removeAll();
             sparseImagePanel.add(loadingSparseLabel, BorderLayout.CENTER);
+            sparseImagePanel.revalidate();
+            sparseImagePanel.repaint();
 
             previewPanel.revalidate();
             previewPanel.repaint();
+
             SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
                 @Override
                 protected Void doInBackground() throws Exception {
-                    processor.setStackSize(100);
+                    processor.setStackSize(nbSlicesPreview);
                     processor.process(imp);
                     return null;
                 }

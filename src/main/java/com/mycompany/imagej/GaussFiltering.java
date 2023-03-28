@@ -105,38 +105,6 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    public static ImageProcess importImage(ImagePlus imp, int maxFrames) {
-
-        ImageProcess processor = new ImageProcess();
-
-        int stackSize = imp.getStackSize();
-        int ImgHeight = imp.getHeight();
-        int ImgWidth = imp.getWidth();
-        int dynamicRange = 0;
-        int nbSlices = stackSize;
-
-        // FIXME probleme s'il y a qu'une seule frame ?
-        if (imp.getStackSize() < 2) {
-            IJ.error("Stack required");
-            throw new RuntimeException("Stack required");
-        } else {
-            nbSlices = maxFrames == 0 ? stackSize : maxFrames;
-            if (imp.getType() == ImagePlus.GRAY8) {
-                dynamicRange = 8;
-            } else if (imp.getType() == ImagePlus.GRAY16) dynamicRange = 16;
-            else {
-                IJ.error("Image type not supported ( only GRAY8 and GRAY16 )");
-            }
-        }
-
-        processor.setDynamicRange(dynamicRange);
-        processor.setWidth(ImgWidth);
-        processor.setHeight(ImgHeight);
-        processor.setStackSize(nbSlices);
-        processor.setOriginalStackSize(stackSize);
-
-        return processor;
-    }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void checkFileExtension(File file) {
@@ -193,62 +161,7 @@ public class GaussFiltering<T extends RealType<T>> implements Command {
 //        }
     }
 
-    protected static JPanel getRowPanel()
-    {
-        JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 
-        originalImagePanel = new JPanel();
-        originalImagePanel.setPreferredSize(new Dimension(300, 300));
-        originalImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
-
-        backgroundImagePanel = new JPanel();
-        backgroundImagePanel.setPreferredSize(new Dimension(300, 300));
-        backgroundImagePanel.setLayout(new BorderLayout());
-        backgroundImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
-
-        sparseImagePanel = new JPanel();
-        sparseImagePanel.setPreferredSize(new Dimension(300, 300));
-        sparseImagePanel.setLayout(new BorderLayout());
-        sparseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
-
-        rowPanel.add(originalImagePanel);
-        rowPanel.add(Box.createHorizontalStrut(50));
-        rowPanel.add(backgroundImagePanel);
-        rowPanel.add(Box.createHorizontalStrut(50));
-        rowPanel.add(sparseImagePanel);
-
-        return rowPanel;
-    }
-
-    protected static JPanel createFileButton()
-    {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-        panel.setPreferredSize(new Dimension(frame.getWidth()-200, 30));
-
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.setPreferredSize(new Dimension((int)(0.2 * panel.getPreferredSize().getWidth()), (int) panel.getPreferredSize().getHeight()));
-        buttonPanel.setLayout(new BorderLayout());
-
-        chooseFileButton = new JButton("Choose File");
-        chooseFileButton.setPreferredSize(new Dimension(400, 30));
-
-        buttonPanel.add(chooseFileButton, BorderLayout.CENTER);
-
-        pathLabel = new JLabel("No file selected");
-        pathLabel.setPreferredSize(new Dimension((int)(0.5 * panel.getPreferredSize().getWidth()), pathLabel.getPreferredSize().height));
-        pathLabel.setHorizontalAlignment(JLabel.LEFT);
-
-        JPanel labelPanel = new JPanel();
-        labelPanel.setPreferredSize(new Dimension((int)(0.5 * panel.getPreferredSize().getWidth()), (int) panel.getPreferredSize().getHeight()));
-        labelPanel.setLayout(new BorderLayout());
-        labelPanel.add(pathLabel, BorderLayout.CENTER);
-
-        panel.add(buttonPanel);
-        panel.add(Box.createHorizontalStrut(50));
-        panel.add(labelPanel);
-
-        return panel;
-    }
     /*-----------------------------------------------------------------------------------------------------------------------*/
 
 }
