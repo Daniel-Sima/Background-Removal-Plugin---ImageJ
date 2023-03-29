@@ -9,10 +9,12 @@ import org.ejml.factory.DecompositionFactory;
 import org.ejml.interfaces.decomposition.QRDecomposition;
 import org.ejml.interfaces.decomposition.SingularValueDecomposition;
 import org.ejml.ops.CommonOps;
+import org.ejml.ops.NormOps;
 import org.ejml.simple.SimpleMatrix;
 import org.ejml.simple.SimpleSVD;
 
 import javax.swing.*;
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -85,6 +87,20 @@ public class ImageProcess {
 
     public void process(ImagePlus imp) {
 
+        //int index = previewPanel.getComponentZOrder(backgroundImagePanel);
+        backgroundImagePanel.removeAll();
+        backgroundImagePanel.add(MyGUI.createLoading("background"));
+
+        backgroundImagePanel.getParent().revalidate();
+        backgroundImagePanel.getParent().repaint();
+
+        //index = previewPanel.getComponentZOrder(sparseImagePanel);
+        sparseImagePanel.removeAll();
+        sparseImagePanel.add(MyGUI.createLoading("sparse"));
+
+        sparseImagePanel.getParent().revalidate();
+        sparseImagePanel.getParent().repaint();
+
 
         long startTime = System.nanoTime();
 
@@ -95,10 +111,15 @@ public class ImageProcess {
          * This means that each line represents one of the layers of the tif image
          *
          */
-        SimpleMatrix originalImg = constructMatrix(imp.getStack(), dynamicRange);
+
+        DenseMatrix64F originalImg = constructMatrix(imp.getStack(), dynamicRange);
 
         //transposing
-        originalImg = originalImg.transpose();
+        DenseMatrix64F origImgTransposed = new DenseMatrix64F(originalImg.numCols, originalImg.numRows);
+        CommonOps.transpose(originalImg, origImgTransposed);
+
+        //taking the transposed image matrix for future operations
+        originalImg = origImgTransposed;
 
         /*
          * SVD decomposition
@@ -108,42 +129,47 @@ public class ImageProcess {
          * s = Diagonal matrix with singular values.
          */
         //ArrayList<SimpleMatrix> svdResult = svdDecomposition(originalImg);
-        ArrayList<SimpleMatrix> svdResult = randomizedSVD(originalImg, k);
+        ArrayList<DenseMatrix64F> svdResult = randomizedSVD(originalImg, k);
 
-        SimpleMatrix X = svdResult.get(0);
-        SimpleMatrix Y = svdResult.get(1);
-        SimpleMatrix s = svdResult.get(2);
+        DenseMatrix64F X = svdResult.get(0);
+        DenseMatrix64F Y = svdResult.get(1);
+        DenseMatrix64F s = svdResult.get(2);
 
         System.gc(); // appel du arbage collector
         Runtime.getRuntime().gc();
 
         // X = X * s
-        X = X.mult(s);
+        DenseMatrix64F sX = new DenseMatrix64F(X.numRows, s.numCols);
+        CommonOps.mult(X, s, sX);
+        X = sX;
 
         //L = X * Y
-        SimpleMatrix L = X.mult(Y);
+        DenseMatrix64F L = new DenseMatrix64F(X.numRows, Y.numCols);
+        CommonOps.mult(X, Y, L);
 
         //S = originalImg - L
-        SimpleMatrix S = originalImg.minus(L);
+        DenseMatrix64F S = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
+        CommonOps.sub(originalImg, L, S);
 
         //thresholding
-        S = threshold(S, tau, String.valueOf(mode));
+        DenseMatrix64F thresholdS = threshold(S, tau, String.valueOf(mode));
 
         //error calculation
         int rankk = (int) Math.round((double) rank / k);
-        SimpleMatrix error = new SimpleMatrix(rank * power, 1);
+        DenseMatrix64F error = new DenseMatrix64F(rank * power, 1);
 
         //T = S - thresholdS
-        SimpleMatrix T = (originalImg.minus(L)).minus(S);
+        DenseMatrix64F T = new DenseMatrix64F(S.numRows, S.numCols);
+        CommonOps.sub(S, thresholdS, T);
 
-        double normD = originalImg.normF();
-        double normT = T.normF();
+        double normD = NormOps.normF(originalImg);
+        double normT = NormOps.normF(T);
 
         error.set(0, normT / normD);
 
         int iii = 1;
         boolean stop = false;
-        double alf = 0;
+        double alf;
 
         for (int i = 1; i < rankk + 1; i++) {
             i = i - 1;
@@ -161,50 +187,55 @@ public class ImageProcess {
                  *  X update
                  */
 
+                //Y transpose
+                DenseMatrix64F transposedY = new DenseMatrix64F(Y.numCols, Y.numRows);
+                CommonOps.transpose(Y, transposedY);
+
                 //X = abs(L * transposedY)
-                X = (L.mult(Y.transpose()));
-                for (int k = 0; k < X.numCols(); k++) {
-                    for (int l = 0; l < X.numRows(); l++) {
+                DenseMatrix64F LY = new DenseMatrix64F(L.numRows, transposedY.numCols);
+                CommonOps.mult(L, transposedY, LY);
+                X = LY;
+                for (int k = 0; k < X.numCols; k++) {
+                    for (int l = 0; l < X.numRows; l++) {
                         X.set(l, k, Math.abs(X.get(l, k)));
                     }
                 }
 
                 /* Do a QR decomposition */
-//                    DenseMatrix64F X2 = X.getMatrix();
-//                    QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X2.numRows, X2.numCols);
-//                    qr.decompose(X2);
-//                    qr.getQ(X2, true);
-//                    X = SimpleMatrix.wrap(X2);
+                QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(X.numRows, X.numCols);
+                qr.decompose(X);
+                qr.getQ(X, true);
 
 
-                X = QRFactorisation_Q(X, j);
+                //X = QRFactorisation_Q(X, j);
 //
                 /*
                  *   Y update
                  */
                 //Y = transposedX * L
-                Y = (X.transpose()).mult(L);
+                DenseMatrix64F transposedX = new DenseMatrix64F(X.numCols, X.numRows);
+                CommonOps.transpose(X, transposedX);
+                CommonOps.mult(transposedX, L, Y);
 
                 //L = X * Y
-                L = X.mult(Y);
+                CommonOps.mult(X, Y, L);
 
                 /*
                  *  S update
                  */
                 //T = originalImg - L
-                T = originalImg.minus(L);
+                CommonOps.sub(originalImg, L, T);
                 //thresholding
 //                    S = thresholding(T);
                 S = threshold(T, tau, String.valueOf(mode));
 
                 // Error, stopping criteria
                 //T = T - S
-                T = T.minus(S);
+                CommonOps.sub(T, S, T);
 
                 int ii = iii + j - 1;
 
-                normT = T.normF();
-
+                normT = NormOps.normF(T);
                 error.set(ii, normT / normD);
 
                 if (error.get(ii) < tol) {
@@ -232,18 +263,19 @@ public class ImageProcess {
                  *   Update of L
                  */
                 //T = (1 + alf) * T
-                //L = L + T
-                L = L.plus(T.scale(1 + alf));
+                CommonOps.scale(1 + alf, T, T);
+                //L = L * T
+                CommonOps.add(L, T, L);
 
                 // Add corest AR
                 if (j > 8) {
                     double mean = mean(error, ii - 7, ii);
                     if (mean > 0.92) {
                         iii = ii;
-                        int YCol = Y.numCols();
-                        int XRow = X.numRows();
+                        int YCol = Y.numCols;
+                        int XRow = X.numRows;
                         if ((YCol - XRow) >= k) {
-                            Y = Y.extractMatrix(0, XRow - 1, 0, Y.numCols());
+                            CommonOps.extract(Y, 0, XRow - 1, 0, Y.numCols, Y, 0, 0);
                         }
                         break;
                     }
@@ -257,34 +289,55 @@ public class ImageProcess {
 //            	AR
             if (i + 1 < rankk) {
                 Random r = new Random();
-                SimpleMatrix RR = new SimpleMatrix(k, originalImg.numRows());
+                DenseMatrix64F RR = new DenseMatrix64F(k, originalImg.numRows);
                 for (int x = 0; x < k; x++) {
-                    for (int z = 0; z < originalImg.numRows(); z++) {
+                    for (int z = 0; z < originalImg.numRows; z++) {
                         RR.set(x, z, r.nextGaussian());
                         //RR.set(x, z, 1.0);
                     }
                 }
                 //v = RR * L
-                SimpleMatrix v = RR.mult(L);
+                DenseMatrix64F v = new DenseMatrix64F(RR.numRows, L.numCols);
+                CommonOps.mult(RR, L, v);
                 //Y = combine(Y, v)
-                Y = Y.combine(2, 0, v);
+                DenseMatrix64F newY = new DenseMatrix64F(Y.numRows * 2, Y.numCols);
+                for (int p = 0; p < Y.numRows; p++) {
+                    for (int q = 0; q < Y.numCols; q++) {
+                        newY.set(p, q, Y.get(p, q));
+                    }
+                }
+                for (int p = 0; p < v.numRows; p++) {
+                    for (int q = 0; q < v.numCols; q++) {
+                        newY.set(p + Y.numRows, q, v.get(p, q));
+                    }
+                }
+                Y = newY;
             }
             i++;
 
         }
 
         //L = X * Y
-        L = X.mult(Y);
+        CommonOps.mult(X, Y, L);
 
-        if (originalImg.numRows() > originalImg.numCols()) {
+        if (originalImg.numRows > originalImg.numCols) {
+            DenseMatrix64F transposedL = new DenseMatrix64F(L.numCols, L.numRows);
+            CommonOps.transpose(L, transposedL);
+            L = transposedL;
 
-            L = L.transpose();
-            S = S.transpose();
-            originalImg = originalImg.transpose();
+            DenseMatrix64F transposedS = new DenseMatrix64F(S.numCols, S.numRows);
+            CommonOps.transpose(S, transposedS);
+            S = transposedS;
+
+            DenseMatrix64F transposedOriginalImg = new DenseMatrix64F(originalImg.numCols, originalImg.numRows);
+            CommonOps.transpose(originalImg, transposedOriginalImg);
+            originalImg = transposedOriginalImg;
         }
 
         /* Noise: G = originalImg - L - S */
-        SimpleMatrix G = (originalImg.minus(L)).minus(S);
+        DenseMatrix64F G = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
+        CommonOps.sub(originalImg, L, G);
+        CommonOps.sub(G, S, G);
 
 //        double[][] A2 = matrix2Array(originalImg);
         double[][] L2 = matrix2Array(L);
@@ -299,18 +352,20 @@ public class ImageProcess {
         ImagePlus noise = new ImagePlus("Noise Image", constructImageStack(G2, dynamicRange));
 
 
-        int index = previewPanel.getComponentZOrder(backgroundImagePanel);
-        previewPanel.remove(backgroundImagePanel);
-        backgroundImagePanel = MyGUI.createPreviewWindow(im);
-        previewPanel.add(backgroundImagePanel, index);
+        //index = previewPanel.getComponentZOrder(backgroundImagePanel);
+        backgroundImagePanel.removeAll();
 
-        index = previewPanel.getComponentZOrder(sparseImagePanel);
-        previewPanel.remove(sparseImagePanel);
-        sparseImagePanel = MyGUI.createPreviewWindow(im2);
-        previewPanel.add(sparseImagePanel, index);
+        backgroundImagePanel.add(MyGUI.createPreviewWindow(im));
 
-        previewPanel.revalidate();
-        previewPanel.repaint();
+        backgroundImagePanel.revalidate();
+        backgroundImagePanel.repaint();
+
+        //index = previewPanel.getComponentZOrder(sparseImagePanel);
+        sparseImagePanel.removeAll();
+        sparseImagePanel.add(MyGUI.createPreviewWindow(im2));
+
+        sparseImagePanel.revalidate();
+        sparseImagePanel.repaint();
 
 
 //        im.show();
@@ -328,7 +383,7 @@ public class ImageProcess {
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static SimpleMatrix constructMatrix(ImageStack stack, int bit) {
+    private static DenseMatrix64F constructMatrix(ImageStack stack, int bit) {
         double[][] matrix = new double[stackSize][width * height];
 
         if (bit == 8) {
@@ -342,13 +397,13 @@ public class ImageProcess {
                 }
             }
         }
-        return new SimpleMatrix(matrix);
+        return new DenseMatrix64F(matrix);
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
 
-    public static ArrayList<SimpleMatrix> randomizedSVD(SimpleMatrix in, int k) {
-        int n = in.numCols();
-        DenseMatrix64F A = in.getMatrix();
+    public static ArrayList<DenseMatrix64F> randomizedSVD(DenseMatrix64F A, int k) {
+        int n = A.numCols;
+
         // Etape 1: Generer une matrice aleatoire R de taille n x k
         SimpleMatrix RR = SimpleMatrix.random(n, k, 0, 1, new java.util.Random()); // imperativement aleatoire entre 0
         // et 1
@@ -403,10 +458,10 @@ public class ImageProcess {
         DenseMatrix64F V_s = new DenseMatrix64F(V_ss.numCols, V_ss.numRows);
         CommonOps.transpose(V_ss, V_s);
 
-        ArrayList<SimpleMatrix> result = new ArrayList<>();
-        result.add(SimpleMatrix.wrap(Us));
-        result.add(SimpleMatrix.wrap(V_s));
-        result.add(SimpleMatrix.wrap(S_ss));
+        ArrayList<DenseMatrix64F> result = new ArrayList<>();
+        result.add(Us);
+        result.add(V_s);
+        result.add(S_ss);
 
         // Renvoyer les matrices U, S et V de la Truncated SVD
         return result;
@@ -470,10 +525,10 @@ public class ImageProcess {
         return result;
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    public static SimpleMatrix threshold(SimpleMatrix data, double tau, String mode) {
-        int rows = data.numRows();
-        int cols = data.numCols();
-        SimpleMatrix result = new SimpleMatrix(rows, cols);
+    public static DenseMatrix64F threshold(DenseMatrix64F data, double tau, String mode) {
+        int rows = data.numRows;
+        int cols = data.numCols;
+        DenseMatrix64F result = new DenseMatrix64F(rows, cols);
         if (mode.equals("SOFT")) {
             for (int i = 0; i < rows; i++) {
                 for (int j = 0; j < cols; j++) {
@@ -542,11 +597,11 @@ public class ImageProcess {
 
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double mean(SimpleMatrix matrix, int start, int end) {
+    private static double mean(DenseMatrix64F matrix, int start, int end) {
         double sum = 0;
         int count = 0;
         for (int i = start; i < end; i++) {
-            for (int j = 0; j < matrix.numCols(); j++) {
+            for (int j = 0; j < matrix.numCols; j++) {
                 sum += matrix.get(i, j);
                 count++;
             }
@@ -554,10 +609,10 @@ public class ImageProcess {
         return sum / count;
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static double[][] matrix2Array(SimpleMatrix matrix) {
-        double[][] array = new double[matrix.numRows()][matrix.numCols()];
-        for (int r = 0; r < matrix.numRows(); r++) {
-            for (int c = 0; c < matrix.numCols(); c++) {
+    private static double[][] matrix2Array(DenseMatrix64F matrix) {
+        double[][] array = new double[matrix.numRows][matrix.numCols];
+        for (int r = 0; r < matrix.numRows; r++) {
+            for (int c = 0; c < matrix.numCols; c++) {
                 array[r][c] = matrix.get(r, c);
             }
         }

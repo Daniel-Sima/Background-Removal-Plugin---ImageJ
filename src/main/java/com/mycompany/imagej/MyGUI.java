@@ -108,13 +108,12 @@ public class MyGUI {
 
                 importImage(imp, 0);
 
-                int index = previewPanel.getComponentZOrder(originalImagePanel);
-                previewPanel.remove(originalImagePanel);
-                originalImagePanel = MyGUI.createPreviewWindow(imp);
-                previewPanel.add(originalImagePanel, index);
+                //int index = previewPanel.getComponentZOrder(originalImagePanel);
+                originalImagePanel.removeAll();
+                originalImagePanel.add(MyGUI.createPreviewWindow(imp));
 
-                previewPanel.revalidate();
-                previewPanel.repaint();
+                originalImagePanel.revalidate();
+                originalImagePanel.repaint();
 
                 previewButtonActionListener.setImp(imp);
                 previewButtonActionListener.setImageProcessor(processor);
@@ -140,25 +139,38 @@ public class MyGUI {
     {
         JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 
+        JPanel originalImage = new JPanel();
+
         originalImagePanel = new JPanel();
         originalImagePanel.setPreferredSize(new Dimension(300, 300));
+        originalImagePanel.setLayout(new BorderLayout());
         originalImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        originalImage.add(originalImagePanel);
+
+        JPanel backgroundImage = new JPanel();
 
         backgroundImagePanel = new JPanel();
         backgroundImagePanel.setPreferredSize(new Dimension(300, 300));
         backgroundImagePanel.setLayout(new BorderLayout());
         backgroundImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
+        backgroundImage.add(backgroundImagePanel);
+
+        JPanel sparseImage = new JPanel();
+
         sparseImagePanel = new JPanel();
         sparseImagePanel.setPreferredSize(new Dimension(300, 300));
         sparseImagePanel.setLayout(new BorderLayout());
         sparseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
-        rowPanel.add(originalImagePanel);
+        sparseImage.add(sparseImagePanel);
+
+        rowPanel.add(originalImage);
         rowPanel.add(Box.createHorizontalStrut(50));
-        rowPanel.add(backgroundImagePanel);
+        rowPanel.add(backgroundImage);
         rowPanel.add(Box.createHorizontalStrut(50));
-        rowPanel.add(sparseImagePanel);
+        rowPanel.add(sparseImage);
 
         return rowPanel;
     }
@@ -239,10 +251,22 @@ public class MyGUI {
             placeholder.add(row1);
             placeholder.add(row2);
 
-
             return placeholder;
         }
         return null;
+    }
+
+    protected static JPanel createLoading(String type)
+    {
+        JPanel panel = new JPanel();
+        panel.setPreferredSize(new Dimension(300, 300));
+        panel.setLayout(new BorderLayout());
+        if (Objects.equals(type, "background")){
+            panel.add(loadingBackgroundLabel, BorderLayout.CENTER);
+        }else{
+            panel.add(loadingSparseLabel, BorderLayout.CENTER);
+        }
+        return panel;
     }
 
     private static class StackCanvas extends Canvas {
@@ -325,28 +349,17 @@ public class MyGUI {
 
         public void actionPerformed(ActionEvent e) {
 
-            backgroundImagePanel.removeAll();
-            backgroundImagePanel.add(loadingBackgroundLabel, BorderLayout.CENTER);
-            backgroundImagePanel.revalidate();
-            backgroundImagePanel.repaint();
-
-            sparseImagePanel.removeAll();
-            sparseImagePanel.add(loadingSparseLabel, BorderLayout.CENTER);
-            sparseImagePanel.revalidate();
-            sparseImagePanel.repaint();
-
-            previewPanel.revalidate();
-            previewPanel.repaint();
+            processor.setStackSize(nbSlicesPreview);
 
             SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
                 @Override
                 protected Void doInBackground() throws Exception {
-                    processor.setStackSize(nbSlicesPreview);
                     processor.process(imp);
                     return null;
                 }
             };
             worker.execute();
+
         }
     }
 }
