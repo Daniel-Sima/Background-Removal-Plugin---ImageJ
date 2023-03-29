@@ -1,10 +1,14 @@
 package com.mycompany.imagej;
 
-import Jama.Matrix;
-import Jama.QRDecomposition;
+
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.process.ByteProcessor;
+import org.ejml.data.DenseMatrix64F;
+import org.ejml.factory.DecompositionFactory;
+import org.ejml.interfaces.decomposition.QRDecomposition;
+import org.ejml.interfaces.decomposition.SingularValueDecomposition;
+import org.ejml.ops.CommonOps;
 import org.ejml.simple.SimpleMatrix;
 import org.ejml.simple.SimpleSVD;
 
@@ -342,52 +346,69 @@ public class ImageProcess {
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
 
-    public static ArrayList<SimpleMatrix> randomizedSVD(SimpleMatrix A, int k) {
-
-        ArrayList<SimpleMatrix> result = new ArrayList<>(3);
-        int n = A.numCols();
-
+    public static ArrayList<SimpleMatrix> randomizedSVD(SimpleMatrix in, int k) {
+        int n = in.numCols();
+        DenseMatrix64F A = in.getMatrix();
         // Etape 1: Generer une matrice aleatoire R de taille n x k
-        SimpleMatrix R =
-                SimpleMatrix.random(n, k, 0, 1, new java.util.Random()); // imperativement aleatoire entre 0 et 1
+        SimpleMatrix RR = SimpleMatrix.random(n, k, 0, 1, new java.util.Random()); // imperativement aleatoire entre 0
+        // et 1
 
-
+        DenseMatrix64F R = new DenseMatrix64F(n, k);
+        for (int x = 0; x < n; x++) {
+            for (int z = 0; z < k; z++) {
+                R.set(x, z, RR.get(x, z));
+            }
+        }
         // Etape 2: Calculer le produit matriciel Y = A * R
-        SimpleMatrix Y = A.mult(R);
+        DenseMatrix64F Y = new DenseMatrix64F(A.numRows, R.numCols);
+        CommonOps.mult(A, R, Y);
 
         // Etape 3: Effectuer une decomposition QR sur la matrice Y
-        // Convert SimpleMatrix to Matrix
-        double[][] data = new double[Y.numRows()][Y.numCols()];
-        for (int i = 0; i < Y.numRows(); i++) {
-            for (int j = 0; j < Y.numCols(); j++) {
+        QRDecomposition<DenseMatrix64F> qr = DecompositionFactory.qr(Y.numRows, Y.numCols);
+        double[][] data = new double[Y.numRows][Y.numCols];
+        for (int i = 0; i < Y.numRows; i++) {
+            for (int j = 0; j < Y.numCols; j++) {
                 data[i][j] = Y.get(i, j);
             }
         }
-        Matrix temp = new Matrix(data);
-
-        // Compute QR decomposition
-        QRDecomposition qr = new QRDecomposition(temp);
-        Matrix Qs = qr.getQ();
-        SimpleMatrix Q = new SimpleMatrix(Qs.getArray());
+        qr.decompose(new DenseMatrix64F(data));
+        DenseMatrix64F Qs = qr.getQ(null, true);
 
         // Etape 4: Calculer la matrice B = Q^T * A
-        SimpleMatrix B = Q.transpose().mult(A);
+        DenseMatrix64F Q = new DenseMatrix64F(Qs.numCols, Qs.numRows);
+        CommonOps.transpose(Qs, Q);
+        DenseMatrix64F B = new DenseMatrix64F(Q.numRows, A.numCols);
+        CommonOps.mult(Q, A, B);
 
         // Etape 5: Appliquer la SVD sur la matrice B
-        SimpleSVD svd = B.svd(true);
+        SingularValueDecomposition<DenseMatrix64F> svd = DecompositionFactory.svd(B.numRows, B.numCols,
+                true, true, true);
+        DenseMatrix64F BB = new DenseMatrix64F(B.numRows, B.numCols);
+        for (int i = 0; i < B.numRows; i++) {
+            for (int j = 0; j < B.numCols; j++) {
+                BB.set(i, j, B.get(i, j));
+            }
+        }
+        svd.decompose(BB);
 
-        SimpleMatrix U = svd.getU();
-        SimpleMatrix S = svd.getW();
-        SimpleMatrix V = svd.getV();
+        DenseMatrix64F U_ss = svd.getU(null, false);
+        DenseMatrix64F S_ss = svd.getW(null);
+        DenseMatrix64F V_ss = svd.getV(null, false);
 
         // Etape 6: Calculer la matrice U de la decomposition en valeurs singulieres
         // tronquees de la matrice d'entree A
-        SimpleMatrix Us = Q.mult(U);
+        DenseMatrix64F Us = new DenseMatrix64F(Qs.numRows, U_ss.numCols);
+        CommonOps.mult(Qs, U_ss, Us);
+
+        DenseMatrix64F V_s = new DenseMatrix64F(V_ss.numCols, V_ss.numRows);
+        CommonOps.transpose(V_ss, V_s);
+
+        ArrayList<SimpleMatrix> result = new ArrayList<>();
+        result.add(SimpleMatrix.wrap(Us));
+        result.add(SimpleMatrix.wrap(V_s));
+        result.add(SimpleMatrix.wrap(S_ss));
 
         // Renvoyer les matrices U, S et V de la Truncated SVD
-        result.add(Us);
-        result.add(V.transpose());
-        result.add(S);
         return result;
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
