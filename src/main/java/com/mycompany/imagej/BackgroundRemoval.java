@@ -8,40 +8,14 @@
 
 package com.mycompany.imagej;
 
-import Jama.Matrix;
-import Jama.QRDecomposition;
-import Jama.SingularValueDecomposition;
-import ij.IJ;
 import ij.ImagePlus;
-import ij.ImageStack;
-import ij.gui.GenericDialog;
-import ij.io.FileInfo;
-import ij.process.ByteProcessor;
-import ij.process.ShortProcessor;
-import net.imagej.Dataset;
-import net.imagej.ImageJ;
-import net.imagej.ops.OpService;
 import net.imglib2.type.numeric.RealType;
-import org.ejml.data.DenseMatrix64F;
-import org.ejml.factory.DecompositionFactory;
-import org.ejml.ops.CommonOps;
-import org.ejml.simple.SimpleMatrix;
-import org.ejml.simple.SimpleSVD;
 import org.scijava.command.Command;
-import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
-import org.scijava.ui.UIService;
 
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Random;
 
 /**
  * This example illustrates how to create an ImageJ {@link Command} plugin.
@@ -53,8 +27,8 @@ import java.util.Random;
  * and replace the {@link run} method implementation with your own logic.
  * </p>
  */
-@Plugin(type = Command.class, menuPath = "Plugins>Gauss Filtering")
-public class GaussFiltering<T extends RealType<T>> implements Command {
+@Plugin(type = Command.class, menuPath = "Plugins>Background Removal")
+public class BackgroundRemoval<T extends RealType<T>> implements Command {
 
     //
     // Feel free to add more parameters here...

@@ -82,7 +82,7 @@ public class MyGUI {
         processor.setSparseImagePanel(sparseImagePanel);
 
         // Load the spinner loading GIF
-        ImageIcon loadingIcon = new ImageIcon(Objects.requireNonNull(GaussFiltering.class.getResource("/icons/loading.gif")));
+        ImageIcon loadingIcon = new ImageIcon(Objects.requireNonNull(BackgroundRemoval.class.getResource("/icons/loading.gif")));
 
         // Create the label with the icon
         loadingBackgroundLabel = new JLabel(loadingIcon);
