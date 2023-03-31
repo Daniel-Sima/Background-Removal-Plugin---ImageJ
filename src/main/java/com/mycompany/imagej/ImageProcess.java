@@ -84,9 +84,13 @@ public class ImageProcess {
         ImageProcess.sparseImagePanel = sparseImagePanel;
     }
 
+    public void finalize(ImagePlus imp){
+        ImagePlus[] images = process(imp);
 
-    public void process(ImagePlus imp) {
-
+        images[0].show();
+        images[1].show();
+    }
+    public void preview(ImagePlus imp){
         //int index = previewPanel.getComponentZOrder(backgroundImagePanel);
         backgroundImagePanel.removeAll();
         backgroundImagePanel.add(MyGUI.createLoading("background"));
@@ -101,6 +105,25 @@ public class ImageProcess {
         sparseImagePanel.getParent().revalidate();
         sparseImagePanel.getParent().repaint();
 
+        ImagePlus[] images = process(imp);
+
+        //index = previewPanel.getComponentZOrder(backgroundImagePanel);
+        backgroundImagePanel.removeAll();
+
+        backgroundImagePanel.add(MyGUI.createPreviewWindow(images[0]));
+
+        backgroundImagePanel.revalidate();
+        backgroundImagePanel.repaint();
+
+        //index = previewPanel.getComponentZOrder(sparseImagePanel);
+        sparseImagePanel.removeAll();
+        sparseImagePanel.add(MyGUI.createPreviewWindow(images[1]));
+
+        sparseImagePanel.revalidate();
+        sparseImagePanel.repaint();
+    }
+
+    public ImagePlus[] process(ImagePlus imp) {
 
         long startTime = System.nanoTime();
 
@@ -352,22 +375,6 @@ public class ImageProcess {
         ImagePlus noise = new ImagePlus("Noise Image", constructImageStack(G2, dynamicRange));
 
 
-        //index = previewPanel.getComponentZOrder(backgroundImagePanel);
-        backgroundImagePanel.removeAll();
-
-        backgroundImagePanel.add(MyGUI.createPreviewWindow(im));
-
-        backgroundImagePanel.revalidate();
-        backgroundImagePanel.repaint();
-
-        //index = previewPanel.getComponentZOrder(sparseImagePanel);
-        sparseImagePanel.removeAll();
-        sparseImagePanel.add(MyGUI.createPreviewWindow(im2));
-
-        sparseImagePanel.revalidate();
-        sparseImagePanel.repaint();
-
-
 //        im.show();
 //        im2.show();
 //        original.show();
@@ -380,6 +387,8 @@ public class ImageProcess {
         System.out.println("Execution time in nanoseconds: " + duration);
         System.out.println("Execution time in milliseconds: " + durationInMilliseconds);
         System.out.println("Execution time in seconds: " + durationInSeconds);
+
+        return new ImagePlus[] {im, im2, noise};
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/

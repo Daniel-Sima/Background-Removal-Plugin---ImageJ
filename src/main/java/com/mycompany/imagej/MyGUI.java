@@ -93,6 +93,9 @@ public class MyGUI {
 
         PreviewButtonActionListener previewButtonActionListener = new PreviewButtonActionListener(previewPanel, backgroundImagePanel);
 
+        JButton finalizeButton = new JButton("Finalize");
+        previewButton.setPreferredSize(new Dimension(200, 30));
+
         //processor = new ImageProcess(previewPanel, backgroundImagePanel, sparseImagePanel);
         chooseFileButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -122,8 +125,24 @@ public class MyGUI {
 
         previewButton.addActionListener(previewButtonActionListener);
 
+        finalizeButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                int stackSize = processor.getOriginalStackSize();
+                processor.setStackSize(stackSize);
+                SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
+                    @Override
+                    protected Void doInBackground() throws Exception {
+                        processor.finalize(imp);
+                        return null;
+                    }
+                };
+                worker.execute();
+            }
+        });
+
         mainLayout.add(previewPanel);
         mainLayout.add(previewButton);
+        mainLayout.add(finalizeButton);
 
         frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
         frame.add(mainLayout, BorderLayout.CENTER);
@@ -354,7 +373,7 @@ public class MyGUI {
             SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
                 @Override
                 protected Void doInBackground() throws Exception {
-                    processor.process(imp);
+                    processor.preview(imp);
                     return null;
                 }
             };
