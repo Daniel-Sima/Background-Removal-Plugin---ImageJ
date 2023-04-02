@@ -30,20 +30,8 @@ import java.io.File;
 @Plugin(type = Command.class, menuPath = "Plugins>Background Removal")
 public class BackgroundRemoval<T extends RealType<T>> implements Command {
 
-    //
-    // Feel free to add more parameters here...
-    //
-//    @Parameter
-//    private Dataset currentData;
-//    @Parameter
-//    private UIService uiService;
-//    @Parameter
-//    private OpService opService;
-    @Override
-    public void run() {
-        execute();
-    }
-
+    static Color[] presetColors = {new Color(255, 255, 255), new Color(192, 192, 192), new Color(213, 170, 213), new Color(170, 170, 255), new Color(170, 213, 255), new Color(170, 213, 170), new Color(255, 255, 170), new Color(250, 224, 175), new Color(255, 170, 170)};
+    static Color bgColor;
     /**
      * This main function serves for development purposes.
      * It allows you to run the plugin immediately out of
@@ -61,24 +49,18 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
     private static JPanel sparseImagePanel;
     private static JPanel noiseImagePanel;
     private static JPanel previewPanel;
-    static Color[] presetColors = { new Color(255,255,255), new Color(192,192,192), new Color(213,170,213), new Color(170,170,255), new Color(170,213,255), new Color(170,213,170),new Color(255,255,170), new Color(250,224,175), new Color(255,170,170) };
-    static Color bgColor;
     private static JFrame frame;
     private static ImagePlus imp;
     JButton previewButton;
 
-
     public static void main(final String... args) throws Exception {
-         execute();
+        execute();
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void execute() {
         generateInterface();
     }
-    /*-----------------------------------------------------------------------------------------------------------------------*/
-
-
-    /*-----------------------------------------------------------------------------------------------------------------------*/
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void checkFileExtension(File file) {
@@ -91,12 +73,18 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
         }
     }
     /*-----------------------------------------------------------------------------------------------------------------------*/
+
+
+    /*-----------------------------------------------------------------------------------------------------------------------*/
+
+    /*-----------------------------------------------------------------------------------------------------------------------*/
     public static String getFileExtension(File file) {
         String fileName = file.getName();
         if (fileName.lastIndexOf(".") != -1 && fileName.lastIndexOf(".") != 0)
             return fileName.substring(fileName.lastIndexOf(".") + 1);
         else return "";
     }
+
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static void generateInterface() {
 //        String[] choice = {"soft", "hard"};
@@ -133,6 +121,21 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
 //                e.printStackTrace();
 //            }
 //        }
+    }
+
+    //
+    // Feel free to add more parameters here...
+    //
+//    @Parameter
+//    private Dataset currentData;
+//    @Parameter
+//    private UIService uiService;
+//    @Parameter
+//    private OpService opService;
+
+    @Override
+    public void run() {
+        execute();
     }
 
 

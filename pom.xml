@@ -87,6 +87,7 @@
 			<id>scijava.public</id>
 			<url>https://maven.scijava.org/content/groups/public</url>
 		</repository>
+
 	</repositories>
 
 	<dependencies>
@@ -101,17 +102,7 @@
 		<dependency>
 			<groupId>org.ejml</groupId>
 			<artifactId>ejml-all</artifactId>
-			<version>0.34</version>
-		</dependency>
-		<dependency>
-			<groupId>colt</groupId>
-			<artifactId>colt</artifactId>
-			<version>1.2.0</version>
-		</dependency>
-		<dependency>
-		    <groupId>org.la4j</groupId>
-		    <artifactId>la4j</artifactId>
-		    <version>0.6.0</version>
+			<version>0.42</version>
 		</dependency>
 	</dependencies>
 	<build>
