@@ -31,6 +31,7 @@
     <orderEntry type="library" name="Maven: jitk:jitk-tps:3.0.3" level="project" />
     <orderEntry type="library" name="Maven: com.googlecode.efficient-java-matrix-library:ejml:0.25" level="project" />
     <orderEntry type="library" name="Maven: org.slf4j:slf4j-api:1.7.36" level="project" />
+    <orderEntry type="library" name="Maven: org.scijava:parsington:3.1.0" level="project" />
     <orderEntry type="library" name="Maven: org.scijava:scijava-search:2.0.1" level="project" />
     <orderEntry type="library" name="Maven: com.google.code.gson:gson:2.10.1" level="project" />
     <orderEntry type="library" name="Maven: org.ocpsoft.prettytime:prettytime:4.0.1.Final" level="project" />
@@ -45,6 +46,8 @@
     <orderEntry type="library" name="Maven: io.scif:scifio-jai-imageio:1.1.1" level="project" />
     <orderEntry type="library" name="Maven: net.imglib2:imglib2-cache:1.0.0-beta-16" level="project" />
     <orderEntry type="library" name="Maven: com.github.ben-manes.caffeine:caffeine:2.4.0" level="project" />
+    <orderEntry type="library" name="Maven: org.scijava:scijava-common:2.91.0" level="project" />
+    <orderEntry type="library" name="Maven: org.bushe:eventbus:1.4" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: net.imagej:imagej-mesh-io:0.1.2" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.google.guava:guava:31.1-jre" level="project" />
     <orderEntry type="library" scope="RUNTIME" name="Maven: com.google.guava:failureaccess:1.0.1" level="project" />
@@ -215,8 +218,5 @@
     <orderEntry type="library" name="Maven: org.ejml:ejml-dsparse:0.42" level="project" />
     <orderEntry type="library" name="Maven: org.ejml:ejml-simple:0.42" level="project" />
     <orderEntry type="library" name="Maven: org.ejml:ejml-fsparse:0.42" level="project" />
-    <orderEntry type="library" name="Maven: org.scijava:scijava-common:2.91.0" level="project" />
-    <orderEntry type="library" name="Maven: org.scijava:parsington:3.1.0" level="project" />
-    <orderEntry type="library" name="Maven: org.bushe:eventbus:1.4" level="project" />
   </component>
 </module>

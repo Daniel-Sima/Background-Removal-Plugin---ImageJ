@@ -390,6 +390,7 @@ public class ImageProcess {
 
         images[0].show();
         images[1].show();
+        images[2].show();
     }
 
     public void preview(ImagePlus imp) {
@@ -427,6 +428,9 @@ public class ImageProcess {
 
     public ImagePlus[] process(ImagePlus imp) {
 
+        System.gc(); // appel du arbage collector
+        Runtime.getRuntime().gc();
+
         long startTime = System.nanoTime();
 
         /** originalImg
@@ -460,14 +464,15 @@ public class ImageProcess {
         DenseMatrix64F Y = svdResult.get(1);
         DenseMatrix64F s = svdResult.get(2);
 
-        System.gc(); // appel du arbage collector
-        Runtime.getRuntime().gc();
+
 
         // X = X * s
         DenseMatrix64F sX = new DenseMatrix64F(X.numRows, s.numCols);
         CommonOps.mult(X, s, sX);
 
         X = sX;
+
+        System.gc(); // appel du arbage collector
 
         //L = X * Y
         DenseMatrix64F L = new DenseMatrix64F(X.numRows, Y.numCols);
@@ -496,6 +501,7 @@ public class ImageProcess {
         int iii = 1;
         boolean stop = false;
         double alf;
+        System.gc(); // appel du arbage collector
 
         for (int i = 1; i < rankk + 1; i++) {
             i = i - 1;
@@ -507,6 +513,10 @@ public class ImageProcess {
                 iii = iii + power;
             }
 
+            System.gc(); // appel du arbage collector
+
+            DenseMatrix64F LY = new DenseMatrix64F(L.numRows, Y.numRows);
+
             for (int j = 1; j < power + 1; j++) {
 
                 /*
@@ -514,7 +524,7 @@ public class ImageProcess {
                  */
 
                 //X = abs(L * transposedY)
-                DenseMatrix64F LY = new DenseMatrix64F(L.numRows, Y.numRows);
+
                 CommonOps.multTransB(L, Y, LY);
                 X = LY;
                 for (int k = 0; k < X.numCols; k++) {
@@ -600,6 +610,8 @@ public class ImageProcess {
                         break;
                     }
                 }
+
+                System.gc(); // appel du arbage collector
             }
 
             if (stop) {
@@ -639,6 +651,8 @@ public class ImageProcess {
 
         //L = X * Y
         CommonOps.mult(X, Y, L);
+
+        System.gc(); // appel du arbage collector
 
         /* Noise: G = originalImg - L - S */
         DenseMatrix64F G = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
