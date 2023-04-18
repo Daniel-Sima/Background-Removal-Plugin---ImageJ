@@ -23,6 +23,7 @@ public class MyGUI {
     private static JLabel loadingSparseLabel;
     private static JLabel loadingNoiseLabel;
     private static JPanel sparseImagePanel;
+    private static JPanel noiseImagePanel;
     private static JButton chooseFileButton;
     private static JLabel pathLabel;
     private static ImagePlus imp;
@@ -76,7 +77,8 @@ public class MyGUI {
         JPanel loadFilePanel = createFileButton();
         mainLayout.add(loadFilePanel);
 
-        previewPanel = getRowPanel();
+        JPanel firstRow = getFirstRowPanel();
+        previewPanel = getSecondRowPanel();
         processor.setPreviewPanel(previewPanel);
         processor.setBackgroundImagePanel(backgroundImagePanel);
         processor.setSparseImagePanel(sparseImagePanel);
@@ -87,6 +89,7 @@ public class MyGUI {
         // Create the label with the icon
         loadingBackgroundLabel = new JLabel(loadingIcon);
         loadingSparseLabel = new JLabel(loadingIcon);
+        loadingNoiseLabel = new JLabel(loadingIcon);
 
         JButton previewButton = new JButton("Preview");
         previewButton.setPreferredSize(new Dimension(200, 30));
@@ -113,7 +116,7 @@ public class MyGUI {
 
                 //int index = previewPanel.getComponentZOrder(originalImagePanel);
                 originalImagePanel.removeAll();
-                originalImagePanel.add(MyGUI.createPreviewWindow(imp));
+                originalImagePanel.add(MyGUI.getPreviewWindow(imp));
 
                 originalImagePanel.revalidate();
                 originalImagePanel.repaint();
@@ -139,7 +142,7 @@ public class MyGUI {
                 worker.execute();
             }
         });
-
+        mainLayout.add(firstRow);
         mainLayout.add(previewPanel);
         mainLayout.add(previewButton);
         mainLayout.add(finalizeButton);
@@ -154,9 +157,16 @@ public class MyGUI {
         return frame;
     }
 
-    protected static JPanel getRowPanel()
+    protected static JPanel getFirstRowPanel()
     {
         JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+
+        //TODO: replace choose file here...
+        JPanel chooseFilePanel = new JPanel();
+
+        chooseFilePanel.setPreferredSize(new Dimension(300, 300));
+        chooseFilePanel.setLayout(new BorderLayout());
+        chooseFilePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
         JPanel originalImage = new JPanel();
 
@@ -167,32 +177,52 @@ public class MyGUI {
 
         originalImage.add(originalImagePanel);
 
-        JPanel backgroundImage = new JPanel();
+        //TODO: add parameters here...
+        JPanel parametersPanel = new JPanel();
+        parametersPanel.setPreferredSize(new Dimension(300, 300));
+        parametersPanel.setLayout(new BorderLayout());
+        parametersPanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+
+        rowPanel.add(chooseFilePanel);
+        rowPanel.add(originalImage);
+        rowPanel.add(parametersPanel);
+        rowPanel.add(Box.createHorizontalStrut(50));
+
+        return rowPanel;
+    }
+
+    protected static JPanel getSecondRowPanel()
+    {
+        JPanel previewPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+
+        JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 
         backgroundImagePanel = new JPanel();
         backgroundImagePanel.setPreferredSize(new Dimension(300, 300));
         backgroundImagePanel.setLayout(new BorderLayout());
         backgroundImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
-        backgroundImage.add(backgroundImagePanel);
-
-        JPanel sparseImage = new JPanel();
 
         sparseImagePanel = new JPanel();
         sparseImagePanel.setPreferredSize(new Dimension(300, 300));
         sparseImagePanel.setLayout(new BorderLayout());
         sparseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
-        sparseImage.add(sparseImagePanel);
+        noiseImagePanel = new JPanel();
+        noiseImagePanel.setPreferredSize(new Dimension(300, 300));
+        noiseImagePanel.setLayout(new BorderLayout());
+        noiseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
-        rowPanel.add(originalImage);
+        rowPanel.add(backgroundImagePanel);
+        rowPanel.add(sparseImagePanel);
+        rowPanel.add(noiseImagePanel);
         rowPanel.add(Box.createHorizontalStrut(50));
-        rowPanel.add(backgroundImage);
-        rowPanel.add(Box.createHorizontalStrut(50));
-        rowPanel.add(sparseImage);
 
-        return rowPanel;
+        previewPanel.add(rowPanel);
+
+        return previewPanel;
     }
+
 
     protected static JPanel createFileButton()
     {
@@ -224,7 +254,27 @@ public class MyGUI {
         return panel;
     }
 
-    protected static JPanel createPreviewWindow(ImagePlus imp)
+    protected static JPanel createPreviewWindow(ImagePlus[] images)
+    {
+        JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        for(ImagePlus imp : images){
+
+            JPanel placeholder = new JPanel();
+            placeholder.setPreferredSize(new Dimension(300, 300));
+            placeholder.setLayout(new BorderLayout());
+            placeholder.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+            placeholder.add(getPreviewWindow(imp), BorderLayout.CENTER);
+
+            rowPanel.add(placeholder);
+
+            rowPanel.revalidate();
+            rowPanel.repaint();
+        }
+
+        return rowPanel;
+    }
+
+    protected static JPanel getPreviewWindow(ImagePlus imp)
     {
         if(imp != null){
             // Get the number of frames in the TIFF stack
@@ -275,17 +325,34 @@ public class MyGUI {
         return null;
     }
 
-    protected static JPanel createLoading(String type)
+    protected static JPanel createLoading()
     {
-        JPanel panel = new JPanel();
-        panel.setPreferredSize(new Dimension(300, 300));
-        panel.setLayout(new BorderLayout());
-        if (Objects.equals(type, "background")){
-            panel.add(loadingBackgroundLabel, BorderLayout.CENTER);
-        }else{
-            panel.add(loadingSparseLabel, BorderLayout.CENTER);
-        }
-        return panel;
+        JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+
+        JPanel backgroundImage = new JPanel();
+        backgroundImage.setPreferredSize(new Dimension(300, 300));
+        backgroundImage.setLayout(new BorderLayout());
+        backgroundImage.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+        backgroundImage.add(loadingBackgroundLabel, BorderLayout.CENTER);
+
+        JPanel sparseImage = new JPanel();
+        sparseImage.setPreferredSize(new Dimension(300, 300));
+        sparseImage.setLayout(new BorderLayout());
+        sparseImage.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+        sparseImage.add(loadingSparseLabel, BorderLayout.CENTER);
+
+        JPanel noiseImage = new JPanel();
+        noiseImage.setPreferredSize(new Dimension(300, 300));
+        noiseImage.setLayout(new BorderLayout());
+        noiseImage.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+        noiseImage.add(loadingNoiseLabel, BorderLayout.CENTER);
+
+        rowPanel.add(backgroundImage);
+        rowPanel.add(sparseImage);
+        rowPanel.add(noiseImage);
+        rowPanel.add(Box.createHorizontalStrut(50));
+
+        return rowPanel;
     }
 
     private static class StackCanvas extends Canvas {

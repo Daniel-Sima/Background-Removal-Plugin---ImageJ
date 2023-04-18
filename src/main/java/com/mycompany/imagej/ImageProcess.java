@@ -126,63 +126,6 @@ public class ImageProcess {
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static ArrayList<SimpleMatrix> svdDecomposition(SimpleMatrix originalImg) {
-        ArrayList<SimpleMatrix> result = new ArrayList<>(3);
-
-        SimpleMatrix U = null, W = null, V = null, check = null;
-        SimpleSVD<SimpleMatrix> svd = originalImg.svd(true); // compacte pour aller plus vite ...
-
-        U = svd.getU();
-        W = svd.getW();
-        V = svd.getV();
-
-        //taking k first columns as having biggest singular values
-        SimpleMatrix X = U.extractMatrix(0, U.numRows(), 0, k); // CMMT
-
-        //putting X to ascending order
-        SimpleMatrix invertedX = new SimpleMatrix(X.numRows(), X.numCols());
-        for (int e = X.numCols() - 1, i = 0; i < X.numCols(); i++, e--) {
-            for (int j = 0; j < X.numRows(); j++) {
-                invertedX.set(j, e, X.get(j, i));
-            }
-        }
-        // mult par -1 pour changer de signe pour avoir les mêmes val qu'en python psq jsp pq y avait un -
-        SimpleMatrix negatif = SimpleMatrix.identity(k);
-        negatif.set(k - 1, k - 1, -1);
-        invertedX = invertedX.mult(negatif);
-
-        X = invertedX;
-
-        result.add(X);
-
-        //taking k first columns as having biggest singular values
-        SimpleMatrix Y = svd.getV().extractMatrix(0, V.numCols(), 0, k); // CMMT
-
-        //putting Y to ascending order
-        SimpleMatrix invertedY = new SimpleMatrix(Y.numRows(), Y.numCols());
-        for (int e = Y.numCols() - 1, i = 0; i < Y.numCols(); i++, e--) {
-            for (int j = 0; j < Y.numRows(); j++) {
-                invertedY.set(j, e, Y.get(j, i));
-            }
-        }
-        invertedY = invertedY.mult(negatif);
-        invertedY = invertedY.transpose();
-        Y = invertedY;
-        result.add(Y);
-
-        //getting submatrix of SingularValues in inverted order
-        SimpleMatrix sVals = W.extractMatrix(0, k, 0, k);
-        SimpleMatrix sDiag = sVals.extractDiag();
-
-        double[] valS = new double[sDiag.numRows()];
-        for (int j = 0, i = sDiag.numRows() - 1; i >= 0; i--, j++) {
-            valS[j] = sDiag.get(i, 0);
-        }
-        SimpleMatrix s = SimpleMatrix.diag(valS);
-        result.add(s);
-
-        return result;
-    }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
     public static DenseMatrix64F threshold(DenseMatrix64F data, double tau, String mode) {
@@ -219,44 +162,6 @@ public class ImageProcess {
     }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
-    private static SimpleMatrix QRFactorisation_Q(SimpleMatrix matrix, int negatif) {
-        if (matrix.numRows() < matrix.numCols()) {
-            System.out.println("Il doit y avoir plus de lignes que de colonnes");
-            throw new RuntimeException("Il doit y avoir plus de lignes que de colonnes");
-        }
-
-        boolean multiplier = false;
-        if (negatif <= 2) {
-            multiplier = true;
-        }
-
-        SimpleMatrix Q = new SimpleMatrix(matrix.numRows(), matrix.numCols());
-        Q.zero();
-
-        SimpleMatrix W, Wbis, Qbis, aux;
-        for (int i = 0; i < Q.numCols(); i++) {
-            W = matrix.extractVector(false, i);
-            Wbis = W;
-            for (int j = 0; j < i; j++) {
-                Qbis = Q.extractVector(false, j);
-                W = W.minus(Qbis.scale(Wbis.dot(Qbis)));
-            }
-            aux = W.divide(W.normF());
-            double[] res = new double[aux.numRows()];
-            for (int k = 0; k < aux.numRows(); k++) {
-                if ((multiplier) && (i == Q.numCols() - 1)) {
-                    res[k] = aux.get(k, 0) * -1;
-                    continue;
-                }
-                res[k] = aux.get(k, 0);
-            }
-
-            Q.setColumn(i, 0, res);
-        }
-
-        return Q;
-
-    }
 
     /*-----------------------------------------------------------------------------------------------------------------------*/
     private static double mean(DenseMatrix64F matrix, int start, int end) {
@@ -394,36 +299,20 @@ public class ImageProcess {
     }
 
     public void preview(ImagePlus imp) {
-        //int index = previewPanel.getComponentZOrder(backgroundImagePanel);
-        backgroundImagePanel.removeAll();
-        backgroundImagePanel.add(MyGUI.createLoading("background"));
+        previewPanel.removeAll();
+        previewPanel.add(MyGUI.createLoading());
 
-        backgroundImagePanel.getParent().revalidate();
-        backgroundImagePanel.getParent().repaint();
-
-        //index = previewPanel.getComponentZOrder(sparseImagePanel);
-        sparseImagePanel.removeAll();
-        sparseImagePanel.add(MyGUI.createLoading("sparse"));
-
-        sparseImagePanel.getParent().revalidate();
-        sparseImagePanel.getParent().repaint();
+        previewPanel.revalidate();
+        previewPanel.repaint();
 
         ImagePlus[] images = process(imp);
 
-        //index = previewPanel.getComponentZOrder(backgroundImagePanel);
-        backgroundImagePanel.removeAll();
+        previewPanel.removeAll();
+        previewPanel.add(MyGUI.createPreviewWindow(images));
 
-        backgroundImagePanel.add(MyGUI.createPreviewWindow(images[0]));
+        previewPanel.revalidate();
+        previewPanel.repaint();
 
-        backgroundImagePanel.revalidate();
-        backgroundImagePanel.repaint();
-
-        //index = previewPanel.getComponentZOrder(sparseImagePanel);
-        sparseImagePanel.removeAll();
-        sparseImagePanel.add(MyGUI.createPreviewWindow(images[1]));
-
-        sparseImagePanel.revalidate();
-        sparseImagePanel.repaint();
     }
 
     public ImagePlus[] process(ImagePlus imp) {
@@ -435,20 +324,14 @@ public class ImageProcess {
 
         /** originalImg
          * It is matrix[rows*cols] where:
-         *   rows = stackSize
-         *   cols = width*height
+         *   cols = stackSize
+         *   rows = width*height
          * This means that each line represents one of the layers of the tif image
          *
          */
 
+        //already transposed
         DenseMatrix64F originalImg = constructMatrix(imp.getStack(), dynamicRange);
-
-        //transposing
-//        DenseMatrix64F origImgTransposed = new DenseMatrix64F(originalImg.numCols, originalImg.numRows);
-//        CommonOps.transpose(originalImg, origImgTransposed);
-//
-//        //taking the transposed image matrix for future operations
-//        originalImg = origImgTransposed;
 
         /*
          * SVD decomposition
