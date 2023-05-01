@@ -7,12 +7,15 @@ import ij.io.FileInfo;
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.EtchedBorder;
+import javax.swing.border.TitledBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.Objects;
 
 /*-----------------------------------------------------------------------------------------------------------------------*/
@@ -35,6 +38,22 @@ public class MyGUI {
 	private static JPanel noiseImagePanel;
 	private static JButton chooseFileButton;
 	private static JLabel pathLabel;
+
+	/** Informations about the Images Stack */
+	private static int IMGWidth, IMGHeight, IMGnbSlices;
+
+	/** True if already a file in GUI */
+	private static boolean alreadySelected;
+
+	/** Progress label in GUI */
+	private static JProgressBar progress;
+
+	/** List of all sliders */
+	private static ArrayList<JSlider> sliders = new ArrayList<>();
+
+	/** Level of estimated time */
+	private static JLabel labelEstimedTime;
+
 	private static ImagePlus imp;
 	private static ImageProcess processor;
 
@@ -80,8 +99,11 @@ public class MyGUI {
 
 		processor.setDynamicRange(dynamicRange);
 		processor.setWidth(ImgWidth);
+		IMGWidth = ImgWidth;
 		processor.setHeight(ImgHeight);
+		IMGHeight = ImgHeight;
 		processor.setStackSize(nbSlices);
+		IMGnbSlices = nbSlices;
 		processor.setOriginalStackSize(stackSize);
 	}
 
@@ -92,6 +114,7 @@ public class MyGUI {
 	 * @return FIXME??
 	 */
 	protected static JFrame getGUIFrame() {
+		alreadySelected = false;
 
 		processor = new ImageProcess();
 		// Create a JFrame and add the JScrollPane to it
@@ -103,8 +126,8 @@ public class MyGUI {
 		JPanel mainLayout = new JPanel();
 		mainLayout.setPreferredSize(frame.getPreferredSize());
 
-		JPanel loadFilePanel = createFileButton();
-		mainLayout.add(loadFilePanel);
+//		JPanel loadFilePanel = createFileButton();
+//		mainLayout.add(loadFilePanel);
 
 		previewPanel = getSecondRowPanel();
 		processor.setPreviewPanel(previewPanel);
@@ -125,18 +148,35 @@ public class MyGUI {
 		loadingSparseLabel = new JLabel(loadingIcon);
 		loadingNoiseLabel = new JLabel(loadingIcon);
 
+		labelEstimedTime = new JLabel(new ImageIcon(
+				(new ImageIcon(Objects.requireNonNull(BackgroundRemoval.class.getResource("/icons/gray_clock.png")))
+						.getImage()).getScaledInstance(40, 40, Image.SCALE_SMOOTH)));
+
 //		JButton previewButton = new JButton("Preview"); // TODO
 //		previewButton.setPreferredSize(new Dimension(200, 30));
 
+		progress = new JProgressBar(0, 100);
+		progress.setValue(0);
+		progress.setStringPainted(true);
+
+		Font font = new Font(Font.MONOSPACED, Font.PLAIN, 14);
 		JButton finalizeButton = new JButton("Finalize");
+		finalizeButton.setFont(font);
 		finalizeButton.setPreferredSize(new Dimension(200, 30));
+
+		// Rank
+		JLabel labelBeforeFinalize = new JLabel("Click on Finalize to complete the processing -> ");
+		labelBeforeFinalize.setFont(font);
+
+		Component[] compo = firstRow.getComponents();
+		JPanel lastPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 
 		// processor = new ImageProcess(previewPanel, backgroundImagePanel,
 		// sparseImagePanel);
 		chooseFileButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				// Handle choose file button click
-				FileDialog fd = new FileDialog(frame, "Choose Image", FileDialog.LOAD);
+				FileDialog fd = new FileDialog(frame, "Choose Images Stack", FileDialog.LOAD);
 				fd.setVisible(true);
 				String path = fd.getDirectory() + fd.getFile();
 				// pathLabel.setMaximumSize(new Dimension(200,
@@ -150,13 +190,50 @@ public class MyGUI {
 
 				// int index = previewPanel.getComponentZOrder(originalImagePanel);
 				originalImagePanel.removeAll();
+
 				originalImagePanel.add(MyGUI.getPreviewWindow(imp));
 
 				originalImagePanel.revalidate();
 				originalImagePanel.repaint();
 
+				if (alreadySelected) {
+					previewPanel.removeAll();
+					previewPanel.add(MyGUI.createWaitingChooseFile());
+
+					previewPanel.revalidate();
+					previewPanel.repaint();
+
+					progress.setValue(0);
+				}
+
 				previewButtonActionListener.setImp(imp);
 				previewButtonActionListener.setImageProcessor(processor);
+
+				alreadySelected = true;
+
+				lastPanel.removeAll();
+
+				// TODO a ameliorer
+				if (IMGWidth * IMGHeight * IMGnbSlices <= 5_000_000) {
+					labelEstimedTime = new JLabel(new ImageIcon((new ImageIcon(
+							Objects.requireNonNull(BackgroundRemoval.class.getResource("/icons/green_clock.png")))
+							.getImage()).getScaledInstance(40, 40, Image.SCALE_SMOOTH)));
+				} else if (IMGWidth * IMGHeight * IMGnbSlices <= 50_000_000) {
+					labelEstimedTime = new JLabel(new ImageIcon((new ImageIcon(
+							Objects.requireNonNull(BackgroundRemoval.class.getResource("/icons/orange_clock.png")))
+							.getImage()).getScaledInstance(40, 40, Image.SCALE_SMOOTH)));
+				} else {
+					labelEstimedTime = new JLabel(new ImageIcon((new ImageIcon(
+							Objects.requireNonNull(BackgroundRemoval.class.getResource("/icons/red_clock.png")))
+							.getImage()).getScaledInstance(40, 40, Image.SCALE_SMOOTH)));
+				}
+
+				lastPanel.add(progress);
+				lastPanel.add(Box.createHorizontalStrut(50));
+				lastPanel.add(labelBeforeFinalize);
+				lastPanel.add(finalizeButton);
+				lastPanel.add(Box.createHorizontalStrut(40));
+				lastPanel.add(labelEstimedTime);
 			}
 		});
 
@@ -167,20 +244,21 @@ public class MyGUI {
 				processor.setStackSize(stackSize);
 
 				/* Setting parameters */
-				Component[] compo = firstRow.getComponents();
 				System.err.println("Rank in finalize: " + ((JSpinner) compo[2].getComponentAt(60, 7)).getValue());
 				processor.setRank((int) ((JSpinner) compo[2].getComponentAt(60, 7)).getValue());
 				System.err.println("Power in finalize: " + ((JSpinner) compo[2].getComponentAt(60, 47)).getValue());
 				processor.setPower((int) ((JSpinner) compo[2].getComponentAt(60, 47)).getValue());
 				System.err.println("Err. tol. in finalize: " + ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
 				processor.setTol((double) ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
-				System.err.println("k in finalize: " + ((JSpinner) compo[2].getComponentAt(250, 47)).getValue());
-				processor.setK((int) ((JSpinner) compo[2].getComponentAt(250, 47)).getValue());
-				System.err.println("Tau in finalize: " + ((JSpinner) compo[2].getComponentAt(250, 7)).getValue());
-				processor.setTau((double) ((JSpinner) compo[2].getComponentAt(250, 7)).getValue());
+				System.err.println("k in finalize: " + ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
+				processor.setK((int) ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
+				System.err.println("Tau in finalize: " + ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
+				processor.setTau((double) ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
 				System.err.println("Mode in finalize: "
 						+ ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
 				processor.setMode((String) ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
+
+				progress.setValue(0);
 
 				SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
 					@Override
@@ -192,9 +270,17 @@ public class MyGUI {
 				worker.execute();
 			}
 		});
+
+		lastPanel.add(progress);
+		lastPanel.add(Box.createHorizontalStrut(50));
+		lastPanel.add(labelBeforeFinalize);
+		lastPanel.add(finalizeButton);
+		lastPanel.add(Box.createHorizontalStrut(40));
+		lastPanel.add(labelEstimedTime);
+
 		mainLayout.add(firstRow);
 		mainLayout.add(previewPanel);
-		mainLayout.add(finalizeButton);
+		mainLayout.add(lastPanel);
 
 		frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
 		frame.add(mainLayout, BorderLayout.CENTER);
@@ -217,29 +303,29 @@ public class MyGUI {
 		JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 
 		// TODO: replace choose file here...
-		JPanel chooseFilePanel = new JPanel();
+		JPanel loadFilePanel = createFileButton();
+//		JPanel chooseFilePanel = new JPanel();
 
-		chooseFilePanel.setPreferredSize(new Dimension(300, 300));
-		chooseFilePanel.setLayout(new BorderLayout());
-		chooseFilePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+//		chooseFilePanel.setPreferredSize(new Dimension(300, 300));
+//		chooseFilePanel.setLayout(new BorderLayout());
+//		chooseFilePanel.setBorder(null);
+//		chooseFilePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
 		JPanel originalImage = new JPanel();
 
-		originalImagePanel = new JPanel(null);
-//		originalImagePanel.setPreferredSize(new Dimension(300, 300));
-		originalImagePanel.setPreferredSize(new Dimension(300, 275));
-		originalImagePanel.setLayout(new BorderLayout());
-//		originalImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
-		originalImagePanel.setBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED));
-
+		originalImagePanel = new JPanel(new BorderLayout());
+		originalImagePanel.setPreferredSize(new Dimension(300, 300));
+		originalImagePanel
+				.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+						"Original", TitledBorder.CENTER, TitledBorder.TOP));
 		originalImage.add(originalImagePanel);
 
-		// TODO: add parameters here...
+		/** Parametres frame */
 		JPanel parametersPanel = new JPanel(null);
-		parametersPanel.setPreferredSize(new Dimension(300, 275));
+		parametersPanel.setPreferredSize(new Dimension(290, 275));
 //		parametersPanel.setBorder(BorderFactory.createLineBorder(Color.red, 1));
 //		parametersPanel.setBorder(BorderFactory.createEtchedBorder(Color.GRAY, Color.DARK_GRAY)); // Créer une bordure en relief
-		parametersPanel.setBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED));
+		parametersPanel.setBorder(BorderFactory.createLoweredBevelBorder());
 
 		Font font = new Font(Font.MONOSPACED, Font.PLAIN, 14);
 		// Rank
@@ -248,7 +334,7 @@ public class MyGUI {
 		labelRank.setBounds(5, 5, 50, 30);
 		SpinnerModel modelRank = new SpinnerNumberModel(3, 0, 99, 1);
 		JSpinner spinnerRank = new JSpinner(modelRank);
-		spinnerRank.setBounds(60, 7, 35, 30);
+		spinnerRank.setBounds(60, 7, 50, 30);
 		parametersPanel.add(spinnerRank);
 		parametersPanel.add(labelRank);
 		// Power
@@ -257,7 +343,7 @@ public class MyGUI {
 		labelPower.setBounds(5, 45, 75, 30);
 		SpinnerModel modelPower = new SpinnerNumberModel(5, 0, 99, 1);
 		JSpinner spinnerPower = new JSpinner(modelPower);
-		spinnerPower.setBounds(60, 47, 35, 30);
+		spinnerPower.setBounds(60, 47, 50, 30);
 		parametersPanel.add(spinnerPower);
 		parametersPanel.add(labelPower);
 		// Err tol
@@ -266,25 +352,25 @@ public class MyGUI {
 		labelTol.setBounds(5, 85, 90, 30);
 		SpinnerModel modelTol = new SpinnerNumberModel(0.001, 0, 99, 0.001);
 		JSpinner spinnerTol = new JSpinner(modelTol);
-		spinnerTol.setBounds(90, 87, 60, 30);
+		spinnerTol.setBounds(90, 87, 90, 30);
 		parametersPanel.add(spinnerTol);
 		parametersPanel.add(labelTol);
 		// k
 		JLabel labelK = new JLabel("k: ");
 		labelK.setFont(font);
-		labelK.setBounds(200, 45, 90, 30);
+		labelK.setBounds(150, 45, 90, 30);
 		SpinnerModel modelK = new SpinnerNumberModel(2, 0, 99, 1);
 		JSpinner spinnerK = new JSpinner(modelK);
-		spinnerK.setBounds(250, 47, 35, 30);
+		spinnerK.setBounds(200, 47, 60, 30);
 		parametersPanel.add(spinnerK);
 		parametersPanel.add(labelK);
 		// Tau
 		JLabel labelTau = new JLabel("Tau: ");
 		labelTau.setFont(font);
-		labelTau.setBounds(200, 5, 90, 30);
+		labelTau.setBounds(150, 5, 90, 30);
 		SpinnerModel modelTau = new SpinnerNumberModel(7.0, 0, 99, 1);
 		JSpinner spinnerTau = new JSpinner(modelTau);
-		spinnerTau.setBounds(250, 7, 35, 30);
+		spinnerTau.setBounds(200, 7, 60, 30);
 		parametersPanel.add(spinnerTau);
 		parametersPanel.add(labelTau);
 		// Thresholding mode
@@ -298,12 +384,13 @@ public class MyGUI {
 		parametersPanel.add(comboBox);
 
 		JButton previewButton = new JButton("Preview"); // TODO
-		previewButton.setBounds(100, 200, 100, 50); // setPreferredSize(new Dimension(200, 30));
+		previewButton.setFont(font);
+		previewButton.setBounds(85, 200, 125, 30); // setPreferredSize(new Dimension(200, 30));
 		previewButton.addActionListener(previewButtonActionListener);
 		previewButton.setToolTipText("Preview for the first 100 frames");
 		parametersPanel.add(previewButton);
 
-		rowPanel.add(chooseFilePanel);
+		rowPanel.add(loadFilePanel);
 		rowPanel.add(originalImage);
 		rowPanel.add(parametersPanel);
 		rowPanel.add(Box.createHorizontalStrut(50));
@@ -320,24 +407,30 @@ public class MyGUI {
 	 * @return JPanel that contains those 3 JPanels for the interface.
 	 */
 	protected static JPanel getSecondRowPanel() {
-		JPanel previewPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+		JPanel previewPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 25));
 
 		JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 
 		backgroundImagePanel = new JPanel();
 		backgroundImagePanel.setPreferredSize(new Dimension(300, 300));
 		backgroundImagePanel.setLayout(new BorderLayout());
-		backgroundImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+		backgroundImagePanel
+				.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+						"Background", TitledBorder.CENTER, TitledBorder.TOP));
 
 		sparseImagePanel = new JPanel();
 		sparseImagePanel.setPreferredSize(new Dimension(300, 300));
 		sparseImagePanel.setLayout(new BorderLayout());
-		sparseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+		sparseImagePanel
+				.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+						"Sparse", TitledBorder.CENTER, TitledBorder.TOP));
 
 		noiseImagePanel = new JPanel();
 		noiseImagePanel.setPreferredSize(new Dimension(300, 300));
 		noiseImagePanel.setLayout(new BorderLayout());
-		noiseImagePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+		noiseImagePanel
+				.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+						"Noise", TitledBorder.CENTER, TitledBorder.TOP));
 
 		rowPanel.add(backgroundImagePanel);
 		rowPanel.add(sparseImagePanel);
@@ -356,29 +449,37 @@ public class MyGUI {
 	 * @return JPanel with this button
 	 */
 	protected static JPanel createFileButton() {
-		JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-		panel.setPreferredSize(new Dimension(frame.getWidth() - 200, 30));
+		JPanel panel = new JPanel(null); // new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+		panel.setPreferredSize(new Dimension(300, 275)); // setPreferredSize(new Dimension(frame.getWidth() - 200, 30));
 
-		JPanel buttonPanel = new JPanel();
-		buttonPanel.setPreferredSize(new Dimension((int) (0.2 * panel.getPreferredSize().getWidth()),
-				(int) panel.getPreferredSize().getHeight()));
-		buttonPanel.setLayout(new BorderLayout());
+		JPanel buttonPanel = new JPanel(null);
+		buttonPanel.setPreferredSize(new Dimension(300, 275)); // setPreferredSize(new Dimension((int) (0.2 *
+																// panel.getPreferredSize().getWidth()),
+//				(int) panel.getPreferredSize().getHeight()));
+//		buttonPanel.setLayout(new BorderLayout());
 
-		chooseFileButton = new JButton("Choose File");
-		chooseFileButton.setPreferredSize(new Dimension(400, 30));
+		Font font = new Font(Font.MONOSPACED, Font.PLAIN, 14);
 
-		buttonPanel.add(chooseFileButton, BorderLayout.CENTER);
+		chooseFileButton = new JButton("Select file...");
+		chooseFileButton.setFont(font);
+		chooseFileButton.setBounds(50, 100, 200, 30); // setPreferredSize(new Dimension(400, 30));
+
+//		buttonPanel.add(chooseFileButton); //add(chooseFileButton, BorderLayout.CENTER);
+		panel.add(chooseFileButton);
 
 		pathLabel = new JLabel("No file selected...");
-		pathLabel.setPreferredSize(
-				new Dimension((int) (0.5 * panel.getPreferredSize().getWidth()), pathLabel.getPreferredSize().height));
-		pathLabel.setHorizontalAlignment(JLabel.LEFT);
+		pathLabel.setFont(font);
+		pathLabel.setBounds(50, 150, 175, 30);
+//		pathLabel.setPreferredSize(
+//				new Dimension((int) (0.5 * panel.getPreferredSize().getWidth()), pathLabel.getPreferredSize().height));
+//		pathLabel.setHorizontalAlignment(JLabel.LEFT);
+		panel.add(pathLabel);
 
 		JPanel labelPanel = new JPanel();
 		labelPanel.setPreferredSize(new Dimension((int) (0.5 * panel.getPreferredSize().getWidth()),
 				(int) panel.getPreferredSize().getHeight()));
 		labelPanel.setLayout(new BorderLayout());
-		labelPanel.add(pathLabel, BorderLayout.CENTER);
+//		labelPanel.add(pathLabel); //add(pathLabel, BorderLayout.CENTER);
 
 		panel.add(buttonPanel);
 		panel.add(Box.createHorizontalStrut(50));
@@ -396,19 +497,36 @@ public class MyGUI {
 	 */
 	protected static JPanel createPreviewWindow(ImagePlus[] images) {
 		JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+
+		int i = 0;
 		for (ImagePlus imp : images) {
 
 			JPanel placeholder = new JPanel();
 			placeholder.setPreferredSize(new Dimension(300, 300));
 			placeholder.setLayout(new BorderLayout());
-			placeholder.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+			if (i == 0) {
+				placeholder.setBorder(
+						BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+								"Background", TitledBorder.CENTER, TitledBorder.TOP));
+			} else if (i == 1) {
+				placeholder.setBorder(
+						BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+								"Sparse", TitledBorder.CENTER, TitledBorder.TOP));
+			} else {
+				placeholder.setBorder(
+						BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+								"Noise", TitledBorder.CENTER, TitledBorder.TOP));
+			}
+
 			placeholder.add(getPreviewWindow(imp), BorderLayout.CENTER);
 
 			rowPanel.add(placeholder);
 
 			rowPanel.revalidate();
 			rowPanel.repaint();
+			i++;
 		}
+		rowPanel.add(Box.createHorizontalStrut(50));
 
 		return rowPanel;
 	}
@@ -422,52 +540,59 @@ public class MyGUI {
 	 */
 	protected static JPanel getPreviewWindow(ImagePlus imp) {
 		if (imp != null) {
-			// Get the number of frames in the TIFF stack
 			int numFrames = imp.getStackSize();
 
-			// Create a custom Canvas to display the preview
-			StackCanvas canvas = new StackCanvas(imp);
+			ImagePlusPanel panel = new ImagePlusPanel(imp);
+			panel.setPreferredSize(new Dimension(400, 400));
 
-			// Create a panel to hold the canvas with a fixed size
 			JPanel placeholder = new JPanel(null);
 			placeholder.setPreferredSize(new Dimension(300, 275));
-			placeholder.setBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED));
+//			placeholder.setBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED));
 
-			// Create a JSlider to slide frames manually
-			JSlider slider = new JSlider(1, numFrames, 1);
+			JSlider slider = new JSlider(1, imp.getStackSize(), 1);
+			sliders.add(slider);
 			slider.setPreferredSize(
 					new Dimension((int) placeholder.getPreferredSize().getWidth(), slider.getPreferredSize().height));
+
+			JLabel sliceInfoLabel = new JLabel();
+
+			String sliceText = "Slice: " + slider.getValue() + "/" + imp.getStackSize();
+			sliceInfoLabel.setText(sliceText);
 
 			slider.addChangeListener(new ChangeListener() {
 				@Override
 				public void stateChanged(ChangeEvent e) {
+					synchronizeSliders(slider, sliders);
 					int slice = slider.getValue();
 					imp.setSlice(slice);
-					canvas.repaint();
+					Image img = imp.getProcessor().getBufferedImage();
+					panel.setImage(img);
+
+					String sliceText = "Slice: " + slice + "/" + imp.getStackSize();
+					sliceInfoLabel.setText(sliceText);
 				}
 			});
 
-			// Create the first row JPanel and set its preferred size to take up 90% of the
-			// space
 			JPanel row1 = new JPanel(null);
 			row1.setPreferredSize(new Dimension((int) placeholder.getPreferredSize().getWidth(),
-					(int) (0.9 * placeholder.getPreferredSize().getHeight())));
+					(int) (0.85 * placeholder.getPreferredSize().getHeight())));
 			row1.setLayout(new BorderLayout());
 			// Add the canvas to the center of the first row panel
-			row1.add(canvas, BorderLayout.CENTER);
+			row1.add(panel, BorderLayout.CENTER);
 
-			// Create the second row JPanel and set its preferred size to take up 10% of the
-			// space
 			JPanel row2 = new JPanel();
 			// row2.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 			row2.setPreferredSize(new Dimension((int) placeholder.getPreferredSize().getWidth(),
-					(int) (0.1 * placeholder.getPreferredSize().getHeight())));
+					(int) (0.15 * placeholder.getPreferredSize().getHeight())));
 			row2.setLayout(new BorderLayout());
 			// Add the slider to the center of the second row panel
-			row2.add(slider, BorderLayout.CENTER);
+			row2.add(sliceInfoLabel, BorderLayout.WEST);
+			row2.add(slider, BorderLayout.SOUTH);
 
-			// Add the first and second row panels to the main panel
 			placeholder.setLayout(new BoxLayout(placeholder, BoxLayout.PAGE_AXIS));
+//	        previewPanel.add(panel, BorderLayout.CENTER);
+//	        previewPanel.add(slider, BorderLayout.SOUTH);
+//	        previewPanel.add(sliceInfoLabel, BorderLayout.LINE_END);
 			placeholder.add(row1);
 			placeholder.add(row2);
 
@@ -478,9 +603,9 @@ public class MyGUI {
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * FIXME a completer
+	 * Method that show the loading process.
 	 * 
-	 * @return
+	 * @return JPanel with the loading .gif
 	 */
 	protected static JPanel createLoading() {
 		JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
@@ -488,20 +613,60 @@ public class MyGUI {
 		JPanel backgroundImage = new JPanel();
 		backgroundImage.setPreferredSize(new Dimension(300, 300));
 		backgroundImage.setLayout(new BorderLayout());
-		backgroundImage.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+		backgroundImage
+				.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+						"Background", TitledBorder.CENTER, TitledBorder.TOP));
 		backgroundImage.add(loadingBackgroundLabel, BorderLayout.CENTER);
 
 		JPanel sparseImage = new JPanel();
 		sparseImage.setPreferredSize(new Dimension(300, 300));
 		sparseImage.setLayout(new BorderLayout());
-		sparseImage.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+		sparseImage.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+				"Sparse", TitledBorder.CENTER, TitledBorder.TOP));
 		sparseImage.add(loadingSparseLabel, BorderLayout.CENTER);
 
 		JPanel noiseImage = new JPanel();
 		noiseImage.setPreferredSize(new Dimension(300, 300));
 		noiseImage.setLayout(new BorderLayout());
-		noiseImage.setBorder(BorderFactory.createLineBorder(Color.black, 1));
+		noiseImage.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+				"Noise", TitledBorder.CENTER, TitledBorder.TOP));
 		noiseImage.add(loadingNoiseLabel, BorderLayout.CENTER);
+
+		rowPanel.add(backgroundImage);
+		rowPanel.add(sparseImage);
+		rowPanel.add(noiseImage);
+		rowPanel.add(Box.createHorizontalStrut(50));
+
+		return rowPanel;
+	}
+
+	/*-----------------------------------------------------------------------------------------------------------------------*/
+	/**
+	 * Method that show the JPanels while the user choose another file.
+	 * 
+	 * @return JPanels empty.
+	 */
+	protected static JPanel createWaitingChooseFile() {
+		JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+
+		JPanel backgroundImage = new JPanel();
+		backgroundImage.setPreferredSize(new Dimension(300, 300));
+		backgroundImage.setLayout(new BorderLayout());
+		backgroundImage
+				.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+						"Background", TitledBorder.CENTER, TitledBorder.TOP));
+
+		JPanel sparseImage = new JPanel();
+		sparseImage.setPreferredSize(new Dimension(300, 300));
+		sparseImage.setLayout(new BorderLayout());
+		sparseImage.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+				"Sparse", TitledBorder.CENTER, TitledBorder.TOP));
+
+		JPanel noiseImage = new JPanel();
+		noiseImage.setPreferredSize(new Dimension(300, 300));
+		noiseImage.setLayout(new BorderLayout());
+		noiseImage.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED),
+				"Noise", TitledBorder.CENTER, TitledBorder.TOP));
 
 		rowPanel.add(backgroundImage);
 		rowPanel.add(sparseImage);
@@ -558,8 +723,8 @@ public class MyGUI {
 			FileInfo fi = imp.getFileInfo();
 			BufferedImage img = imp.getStack().getProcessor(slice).getBufferedImage();
 
-			int scaledWidth = 300;// (int) (imp.getWidth() * scale);
-			int scaledHeight = 275; // (int) (imp.getHeight() * scale);
+			int scaledWidth = (int) (imp.getWidth() * scale);
+			int scaledHeight = (int) (imp.getHeight() * scale);
 
 			// Calculate the offset needed to center the image on the canvas
 			int offsetX = (getWidth() - scaledWidth) / 2;
@@ -577,6 +742,16 @@ public class MyGUI {
 			// Swap the buffers
 			g.drawImage(offscreen, 0, 0, getWidth(), getHeight(), null);
 		}
+	}
+
+	/*-----------------------------------------------------------------------------------------------------------------------*/
+	/**
+	 * Methods that updates the progress bar of the GreGoDec algorithm.
+	 * 
+	 * @param value
+	 */
+	public static void setProgressBar(int value) {
+		progress.setValue(value);
 	}
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
@@ -641,13 +816,15 @@ public class MyGUI {
 			processor.setPower((int) ((JSpinner) compo[2].getComponentAt(60, 47)).getValue());
 			System.err.println("Err. tol. in preview: " + ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
 			processor.setTol((double) ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
-			System.err.println("k in preview: " + ((JSpinner) compo[2].getComponentAt(250, 47)).getValue());
-			processor.setK((int) ((JSpinner) compo[2].getComponentAt(250, 47)).getValue());
-			System.err.println("Tau in preview: " + ((JSpinner) compo[2].getComponentAt(250, 7)).getValue());
-			processor.setTau((double) ((JSpinner) compo[2].getComponentAt(250, 7)).getValue());
+			System.err.println("k in preview: " + ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
+			processor.setK((int) ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
+			System.err.println("Tau in preview: " + ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
+			processor.setTau((double) ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
 			System.err.println(
 					"Mode in preview: " + ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
 			processor.setMode((String) ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
+
+			progress.setValue(0);
 
 			SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
 				@Override
@@ -657,6 +834,51 @@ public class MyGUI {
 				}
 			};
 			worker.execute();
+		}
+	}
+
+	/*-----------------------------------------------------------------------------------------------------------------------*/
+	private static void synchronizeSliders(JSlider sourceSlider, ArrayList<JSlider> sliders) {
+		int value = sourceSlider.getValue();
+		for (JSlider slider : sliders) {
+			if (slider != sourceSlider) {
+				slider.setValue(value);
+			}
+		}
+	}
+
+	/*-----------------------------------------------------------------------------------------------------------------------*/
+	/*-----------------------------------------------------------------------------------------------------------------------*/
+	/*-----------------------------------------------------------------------------------------------------------------------*/
+	public static class ImagePlusPanel extends JPanel {
+		private static final long serialVersionUID = 1L;
+		private ImagePlus imp;
+		private Image img;
+
+		public ImagePlusPanel(ImagePlus imp) {
+			this.imp = imp;
+			this.img = imp.getImage();
+			setPreferredSize(new Dimension(imp.getWidth(), imp.getHeight()));
+		}
+
+		public void setImage(Image img) {
+			this.img = img;
+			repaint();
+		}
+
+		@Override
+		protected void paintComponent(Graphics g) {
+			super.paintComponent(g);
+
+			double scale = Math.min((double) getWidth() / imp.getWidth(), (double) getHeight() / imp.getHeight());
+
+			int scaledWidth = (int) (imp.getWidth() * scale);
+			int scaledHeight = (int) (imp.getHeight() * scale);
+
+			int offsetX = (getWidth() - scaledWidth) / 2;
+			int offsetY = (getHeight() - scaledHeight) / 2;
+
+			g.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight, null);
 		}
 	}
 }

@@ -104,6 +104,9 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
 
 		// frame.pack();
 		frame.setVisible(true);
+		
+		// Pour empecher la modificaiton de la fenetre 
+		frame.setResizable(false);
 
 		// Loop through each frame in the TIFF stack and repaint the canvas
 //        for (int i = 1; i <= numFrames; i++) {

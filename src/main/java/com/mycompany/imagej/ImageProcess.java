@@ -433,23 +433,34 @@ public class ImageProcess {
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * Method that shows the result of the Background Removal.
+	 * Method that shows the result of the Background Removal on the JPanels.
 	 * 
 	 * @param imp Images Stack opened by ImageJ
 	 */
 	public void finalize(ImagePlus imp) {
+		previewPanel.removeAll();
+		previewPanel.add(MyGUI.createLoading());
+		
+		previewPanel.revalidate();
+		previewPanel.repaint();
+		
 		ImagePlus[] images = process(imp);
 
-		images[0].show();
-		images[1].show();
-		images[2].show();
+		previewPanel.removeAll();
+		previewPanel.add(MyGUI.createPreviewWindow(images));
+
+		previewPanel.revalidate();
+		previewPanel.repaint();
+//		images[0].show();
+//		images[1].show();
+//		images[2].show();
 	}
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * FIXME a completer
+	 * Method that shows the preview on the JPanels of the GUI.
 	 * 
-	 * @param imp
+	 * @param imp Images Stack opened by ImageJ
 	 */
 	public void preview(ImagePlus imp) {
 		previewPanel.removeAll();
@@ -495,6 +506,7 @@ public class ImageProcess {
 
 		// already transposed
 		DenseMatrix64F originalImg = constructMatrix(imp.getStack(), dynamicRange);
+		MyGUI.setProgressBar(3);
 
 		/*
 		 * SVD decomposition svdResult = ArrayList<X, Y, s> X = Unitary matrix having
@@ -545,7 +557,16 @@ public class ImageProcess {
 		double alf;
 		System.gc(); // appel du arbage collector
 
+		int progress = 12;
+		MyGUI.setProgressBar(progress);
+		
 		for (int i = 1; i < rankk + 1; i++) {
+			/* Progress update */
+			if (i == Math.floor(rankk/2)) {
+				progress = 43;
+				MyGUI.setProgressBar(progress);
+			}
+			
 			i = i - 1;
 			int rrank = rank;
 			alf = 0;
@@ -689,6 +710,8 @@ public class ImageProcess {
 			i++;
 
 		}
+		
+		MyGUI.setProgressBar(75);
 
 		// L = X * Y
 		CommonOps.mult(X, Y, L);
@@ -699,6 +722,8 @@ public class ImageProcess {
 		DenseMatrix64F G = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
 		CommonOps.sub(originalImg, L, G);
 		CommonOps.sub(G, S, G);
+		
+		MyGUI.setProgressBar(80);
 
 //        double[][] A2 = matrix2Array(originalImg);
 //        double[][] L2 = matrix2Array(L);
@@ -724,6 +749,8 @@ public class ImageProcess {
 		System.out.println("Execution time in nanoseconds: " + duration);
 		System.out.println("Execution time in milliseconds: " + durationInMilliseconds);
 		System.out.println("Execution time in seconds: " + durationInSeconds);
+
+		MyGUI.setProgressBar(100);
 
 		return new ImagePlus[] { im, im2, noise };
 	}
