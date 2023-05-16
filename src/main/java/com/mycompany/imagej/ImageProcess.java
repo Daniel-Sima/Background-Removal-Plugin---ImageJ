@@ -451,9 +451,10 @@ public class ImageProcess {
 
 		previewPanel.revalidate();
 		previewPanel.repaint();
-//		images[0].show();
-//		images[1].show();
-//		images[2].show();
+
+		images[0].show();
+		images[1].show();
+		images[2].show();
 	}
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
