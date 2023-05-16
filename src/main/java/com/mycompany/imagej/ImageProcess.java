@@ -486,13 +486,6 @@ public class ImageProcess {
 	 * @return Background, Sparse and Noise Images Stack (ImagePlus) in an array
 	 */
 	public ImagePlus[] process(ImagePlus imp) {
-		System.err.println("Rank in process: " + rank);
-		System.err.println("Power in process: " + power);
-		System.err.println("Err. tol. in process: " + tol);
-		System.err.println("k in process: " + k);
-		System.err.println("Tau in process: " + tau);
-		System.err.println("Mode in process: " + mode);
-
 		System.gc(); // appel du garbage collector
 		Runtime.getRuntime().gc();
 

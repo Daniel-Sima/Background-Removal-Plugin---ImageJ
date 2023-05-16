@@ -244,18 +244,11 @@ public class MyGUI {
 				processor.setStackSize(stackSize);
 
 				/* Setting parameters */
-				System.err.println("Rank in finalize: " + ((JSpinner) compo[2].getComponentAt(60, 7)).getValue());
 				processor.setRank((int) ((JSpinner) compo[2].getComponentAt(60, 7)).getValue());
-				System.err.println("Power in finalize: " + ((JSpinner) compo[2].getComponentAt(60, 47)).getValue());
 				processor.setPower((int) ((JSpinner) compo[2].getComponentAt(60, 47)).getValue());
-				System.err.println("Err. tol. in finalize: " + ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
 				processor.setTol((double) ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
-				System.err.println("k in finalize: " + ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
 				processor.setK((int) ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
-				System.err.println("Tau in finalize: " + ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
 				processor.setTau((double) ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
-				System.err.println("Mode in finalize: "
-						+ ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
 				processor.setMode((String) ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
 
 				progress.setValue(0);
@@ -713,11 +706,6 @@ public class MyGUI {
 			// Calculate the scale factor for the image
 			double scale = Math.min((double) getWidth() / imp.getWidth(), (double) getHeight() / imp.getHeight());
 
-//			if (imp.getWidth() < getWidth() && imp.getHeight() < getHeight()) {
-//				System.err.println("CE FA");
-//				scale = 1.0;
-//			}
-
 			// Get the current slice and the corresponding image processor
 			int slice = imp.getCurrentSlice();
 			FileInfo fi = imp.getFileInfo();
@@ -810,18 +798,11 @@ public class MyGUI {
 
 			/* Setting parameters */
 			Component[] compo = firstRow.getComponents();
-			System.err.println("Rank in preview: " + ((JSpinner) compo[2].getComponentAt(60, 7)).getValue());
 			processor.setRank((int) ((JSpinner) compo[2].getComponentAt(60, 7)).getValue());
-			System.err.println("Power in preview: " + ((JSpinner) compo[2].getComponentAt(60, 47)).getValue());
 			processor.setPower((int) ((JSpinner) compo[2].getComponentAt(60, 47)).getValue());
-			System.err.println("Err. tol. in preview: " + ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
 			processor.setTol((double) ((JSpinner) compo[2].getComponentAt(90, 87)).getValue());
-			System.err.println("k in preview: " + ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
 			processor.setK((int) ((JSpinner) compo[2].getComponentAt(200, 47)).getValue());
-			System.err.println("Tau in preview: " + ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
 			processor.setTau((double) ((JSpinner) compo[2].getComponentAt(200, 7)).getValue());
-			System.err.println(
-					"Mode in preview: " + ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
 			processor.setMode((String) ((JComboBox<String>) compo[2].getComponentAt(160, 127)).getSelectedItem());
 
 			progress.setValue(0);
