@@ -12,6 +12,11 @@ import java.io.File;
 /*-----------------------------------------------------------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------------------------------------------*/
+/**
+ * Class with the main method used by the ImageJ plugin.
+ *
+ * @param <T>
+ */
 @Plugin(type = Command.class, menuPath = "Plugins>Background Removal")
 public class BackgroundRemoval<T extends RealType<T>> implements Command {
 
@@ -20,7 +25,6 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
 			new Color(250, 224, 175), new Color(255, 170, 170) };
 	static Color bgColor;
 
-	// FIXME bcp de unused
 	private static MyGUI.PreviewButtonActionListener previewButtonActionListener;
 	private static JButton chooseFileButton;
 	private static JLabel pathLabel;
@@ -37,11 +41,11 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
 	/**
 	 * The main function that executes the plugin.
 	 * 
-	 * @param args
+	 * @param args none
 	 * @throws Exception
 	 */
 	public static void main(final String... args) throws Exception {
-		execute(); 
+		execute();
 	}
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
@@ -55,8 +59,9 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * FIXME utilise ?
-	 * @param file
+	 * Function used before to check the file extension in logs
+	 * 
+	 * @param file File used
 	 */
 	public static void checkFileExtension(File file) {
 		String fileExtension = getFileExtension(file);
@@ -69,6 +74,12 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
 	}
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
+	/**
+	 * Function used before to get the extension in the file name.
+	 * 
+	 * @param file File used
+	 * @return
+	 */
 	public static String getFileExtension(File file) {
 		String fileName = file.getName();
 		if (fileName.lastIndexOf(".") != -1 && fileName.lastIndexOf(".") != 0)
@@ -82,55 +93,18 @@ public class BackgroundRemoval<T extends RealType<T>> implements Command {
 	 * Generate the user interface and start the plugin.
 	 */
 	public static void generateInterface() {
-//        String[] choice = {"soft", "hard"};
-//        GenericDialog d = new GenericDialog("Low Rank and Sparse tool");
-//        d.addNumericField("tau:", tau, 2);
-//        d.addChoice("soft or hard thresholding", choice, choice[0]);
-//        d.showDialog();
-//        if (d.wasCanceled()) return;
-//        // recuperation de la valeur saisie par l'user
-//        tau = d.getNextNumber();
-//        String filePath = d.getNextString();
-//        int c = d.getNextChoiceIndex();
-//        if (c == 0) mode = MODE.SOFT;
-//        else mode = MODE.HARD;
-//        if (d.invalidNumber()) {
-//            IJ.error("Invalid parameters");
-//            return;
-//        }
-
 		// Create a JFrame and add the JScrollPane to it
 		frame = MyGUI.getGUIFrame();
 
 		// frame.pack();
 		frame.setVisible(true);
-		
-		// Pour empecher la modificaiton de la fenetre 
+
+		// Pour empecher la modificaiton de la fenetre
 		frame.setResizable(false);
 
-		// Loop through each frame in the TIFF stack and repaint the canvas
-//        for (int i = 1; i <= numFrames; i++) {
-//            imp.setSlice(i);
-//            canvas.repaint();
-//            try {
-//                Thread.sleep(100); // Add a delay between frames for smoother preview
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
 	}
 
-//    @Parameter
-//    private Dataset currentData;
-//    @Parameter
-//    private UIService uiService;
-//    @Parameter
-//    private OpService opService;
-
 	/*-----------------------------------------------------------------------------------------------------------------------*/
-	/**
-	 * FIXME utile ?
-	 */
 	@Override
 	public void run() {
 		execute();

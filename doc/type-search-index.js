@@ -1,0 +1,1 @@
+typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html"},{"p":"com.mycompany.imagej","l":"BackgroundRemoval"},{"p":"com.mycompany.imagej","l":"MyGUI.ImagePlusPanel"},{"p":"com.mycompany.imagej","l":"ImageProcess"},{"p":"com.mycompany.imagej","l":"MyGUI"},{"p":"com.mycompany.imagej","l":"MyGUI.PreviewButtonActionListener"}];updateSearchResults();

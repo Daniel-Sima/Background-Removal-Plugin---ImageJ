@@ -3,17 +3,13 @@ package com.mycompany.imagej;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.process.ByteProcessor;
-import org.ejml.data.DMatrix1Row;
-import org.ejml.data.DMatrixRMaj;
 import org.ejml.data.DenseMatrix64F;
-import org.ejml.dense.row.CommonOps_DDRM;
 import org.ejml.factory.DecompositionFactory;
 import org.ejml.interfaces.decomposition.QRDecomposition;
 import org.ejml.interfaces.decomposition.SingularValueDecomposition;
 import org.ejml.ops.CommonOps;
 import org.ejml.ops.NormOps;
 import org.ejml.simple.SimpleMatrix;
-import org.ejml.simple.SimpleSVD;
 
 import javax.swing.*;
 import java.util.ArrayList;
@@ -33,7 +29,6 @@ public class ImageProcess {
 	private static MODE mode = MODE.SOFT;
 	private static double tol = 0.001;
 
-	;
 	private static JPanel previewPanel;
 	private static JPanel backgroundImagePanel;
 	private static JPanel sparseImagePanel;
@@ -65,15 +60,9 @@ public class ImageProcess {
 		return denseMatrix;
 	}
 
-//    public ImageProcess(JPanel previewPanel, JPanel backgroundImagePanel, JPanel sparseImagePanel){
-//        ImageProcess.previewPanel = previewPanel;
-//        ImageProcess.backgroundImagePanel = backgroundImagePanel;
-//        ImageProcess.sparseImagePanel = sparseImagePanel;
-//    }
-
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * Mathod that does the SVD computation randomly, to gain in performance.
+	 * Method that does the SVD computation randomly, to gain in performance.
 	 * 
 	 * @param A Matrix to apply the SVD
 	 * @param k Number of biggest first singular values
@@ -83,8 +72,8 @@ public class ImageProcess {
 		int n = A.numCols;
 
 		// Etape 1: Generer une matrice aleatoire R de taille n x k
-		SimpleMatrix RR = SimpleMatrix.random(n, k, 0, 1, new java.util.Random()); // imperativement aleatoire entre 0
-		// et 1
+		// imperativement aleatoire entre 0 et 1
+		SimpleMatrix RR = SimpleMatrix.random(n, k, 0, 1, new java.util.Random());
 
 		DenseMatrix64F R = new DenseMatrix64F(n, k);
 		for (int x = 0; x < n; x++) {
@@ -249,27 +238,6 @@ public class ImageProcess {
 			newStack.addSlice(bp);
 		}
 
-//        for (int z = 0; z < stackSize; z++) {
-//
-//            if (dynamicRange == 8) {
-//                for (int i = 0; i < pixels.length; i++) {
-//
-//                }
-//
-//            }
-////          } else if (dynamicRange == 16) {
-////          short[][] shortData = new short[S2.length][S2[0].length];
-////          for (int i = 0; i < S2.length; i++) {
-////              for (int j = 0; j < S2[i].length; j++) {
-////                  shortData[i][j] = (short) Math.round(S2[i][j]);
-////              }
-////          }
-////          S2 = shortData;
-//            else {
-//                System.out.println("The dynamic range should be equal to 8 or 16 (bits)");
-//            }
-//        }
-
 		return newStack;
 	}
 
@@ -314,7 +282,7 @@ public class ImageProcess {
 		if (mode == "Hard") {
 			ImageProcess.mode = MODE.HARD;
 		}
-		
+
 		if (mode == "Soft") {
 			ImageProcess.mode = MODE.SOFT;
 		}
@@ -440,10 +408,10 @@ public class ImageProcess {
 	public void finalize(ImagePlus imp) {
 		previewPanel.removeAll();
 		previewPanel.add(MyGUI.createLoading());
-		
+
 		previewPanel.revalidate();
 		previewPanel.repaint();
-		
+
 		ImagePlus[] images = process(imp);
 
 		previewPanel.removeAll();
@@ -553,14 +521,14 @@ public class ImageProcess {
 
 		int progress = 12;
 		MyGUI.setProgressBar(progress);
-		
+
 		for (int i = 1; i < rankk + 1; i++) {
 			/* Progress update */
-			if (i == Math.floor(rankk/2)) {
+			if (i == Math.floor(rankk / 2)) {
 				progress = 43;
 				MyGUI.setProgressBar(progress);
 			}
-			
+
 			i = i - 1;
 			int rrank = rank;
 			alf = 0;
@@ -570,7 +538,7 @@ public class ImageProcess {
 				iii = iii + power;
 			}
 
-			System.gc(); // appel du arbage collector
+			System.gc(); // appel du garbage collector
 
 			DenseMatrix64F LY = new DenseMatrix64F(L.numRows, Y.numRows);
 
@@ -596,7 +564,6 @@ public class ImageProcess {
 				qr.getQ(X, true);
 
 				// X = QRFactorisation_Q(X, j);
-//
 				/*
 				 * Y update
 				 */
@@ -612,7 +579,6 @@ public class ImageProcess {
 				// T = originalImg - L
 				CommonOps.sub(originalImg, L, T);
 				// thresholding
-//                    S = thresholding(T);
 				S = threshold(T, tau, String.valueOf(mode));
 
 				// Error, stopping criteria
@@ -667,7 +633,7 @@ public class ImageProcess {
 					}
 				}
 
-				System.gc(); // appel du arbage collector
+				System.gc(); // appel du garbage collector
 			}
 
 			if (stop) {
@@ -704,7 +670,7 @@ public class ImageProcess {
 			i++;
 
 		}
-		
+
 		MyGUI.setProgressBar(75);
 
 		// L = X * Y
@@ -716,25 +682,13 @@ public class ImageProcess {
 		DenseMatrix64F G = new DenseMatrix64F(originalImg.numRows, originalImg.numCols);
 		CommonOps.sub(originalImg, L, G);
 		CommonOps.sub(G, S, G);
-		
+
 		MyGUI.setProgressBar(80);
 
-//        double[][] A2 = matrix2Array(originalImg);
-//        double[][] L2 = matrix2Array(L);
-//        double[][] S2 = matrix2Array(S);
-//        double[][] G2 = matrix2Array(G);
-
-//        ImagePlus original = new ImagePlus(" Original Image ", constructImageStack(
-//                A2, dynamicRange));
+		/* Construction des stack d'images */
 		ImagePlus im = new ImagePlus(" Background Image ", constructImageStack(L, dynamicRange));
 		ImagePlus im2 = new ImagePlus(" Sparse Image ", constructImageStack(S, dynamicRange));
-		/* Construction du stack d'images pour le bruit (noise) */
 		ImagePlus noise = new ImagePlus("Noise Image", constructImageStack(G, dynamicRange));
-
-//        im.show();
-//        im2.show();
-//        original.show();
-//        noise.show();        // Affichage du bruit (noise)
 
 		long endTime = System.nanoTime();
 		long duration = endTime - startTime;

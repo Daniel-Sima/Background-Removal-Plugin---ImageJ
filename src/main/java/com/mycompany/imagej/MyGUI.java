@@ -2,10 +2,8 @@ package com.mycompany.imagej;
 
 import ij.IJ;
 import ij.ImagePlus;
-import ij.io.FileInfo;
 
 import javax.swing.*;
-import javax.swing.border.BevelBorder;
 import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.ChangeEvent;
@@ -13,8 +11,6 @@ import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.image.BufferedImage;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -81,7 +77,6 @@ public class MyGUI {
 		int dynamicRange = 0;
 		int nbSlices;
 
-		// FIXME probleme s'il y a qu'une seule frame ?
 		if (imp.getStackSize() < 2) {
 			IJ.error("Stack required");
 			throw new RuntimeException("Stack required");
@@ -111,14 +106,14 @@ public class MyGUI {
 	/**
 	 * Method that implements the user interface for the Background Plugin.
 	 * 
-	 * @return FIXME??
+	 * @return the GUI frame
 	 */
 	protected static JFrame getGUIFrame() {
 		alreadySelected = false;
 
 		processor = new ImageProcess();
 		// Create a JFrame and add the JScrollPane to it
-		frame = new JFrame("Background Removal"); // XXX ("TIFF Stack Preview");
+		frame = new JFrame("Background Removal"); 
 		frame.setSize(1100, 750);
 		frame.setLocationRelativeTo(null); // Center frame on screen
 		// frame.setLayout(new FlowLayout());
@@ -126,13 +121,10 @@ public class MyGUI {
 		JPanel mainLayout = new JPanel();
 		mainLayout.setPreferredSize(frame.getPreferredSize());
 
-//		JPanel loadFilePanel = createFileButton();
-//		mainLayout.add(loadFilePanel);
-
 		previewPanel = getSecondRowPanel();
 		processor.setPreviewPanel(previewPanel);
-		processor.setBackgroundImagePanel(backgroundImagePanel); // FIXME
-		processor.setSparseImagePanel(sparseImagePanel); // FIXME
+		processor.setBackgroundImagePanel(backgroundImagePanel); 
+		processor.setSparseImagePanel(sparseImagePanel); 
 
 		PreviewButtonActionListener previewButtonActionListener = new PreviewButtonActionListener(previewPanel,
 				backgroundImagePanel);
@@ -152,9 +144,6 @@ public class MyGUI {
 				(new ImageIcon(Objects.requireNonNull(BackgroundRemoval.class.getResource("/icons/gray_clock.png")))
 						.getImage()).getScaledInstance(40, 40, Image.SCALE_SMOOTH)));
 
-//		JButton previewButton = new JButton("Preview"); // TODO
-//		previewButton.setPreferredSize(new Dimension(200, 30));
-
 		progress = new JProgressBar(0, 100);
 		progress.setValue(0);
 		progress.setStringPainted(true);
@@ -171,16 +160,12 @@ public class MyGUI {
 		Component[] compo = firstRow.getComponents();
 		JPanel lastPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 
-		// processor = new ImageProcess(previewPanel, backgroundImagePanel,
-		// sparseImagePanel);
 		chooseFileButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				// Handle choose file button click
 				FileDialog fd = new FileDialog(frame, "Choose Images Stack", FileDialog.LOAD);
 				fd.setVisible(true);
 				String path = fd.getDirectory() + fd.getFile();
-				// pathLabel.setMaximumSize(new Dimension(200,
-				// pathLabel.getPreferredSize().height));
 				pathLabel.setText(fd.getFile()); // Update path label text
 
 				// TODO:check extension
@@ -188,7 +173,6 @@ public class MyGUI {
 
 				importImage(imp, 0);
 
-				// int index = previewPanel.getComponentZOrder(originalImagePanel);
 				originalImagePanel.removeAll();
 
 				originalImagePanel.add(MyGUI.getPreviewWindow(imp));
@@ -277,7 +261,6 @@ public class MyGUI {
 
 		frame.setLayout(new BoxLayout(frame.getContentPane(), BoxLayout.Y_AXIS));
 		frame.add(mainLayout, BorderLayout.CENTER);
-		// frame.add(previewPanel, BorderLayout.SOUTH);
 
 		bgColor = presetColors[0];
 		frame.setBackground(bgColor);
@@ -295,14 +278,7 @@ public class MyGUI {
 	protected static JPanel getFirstRowPanel(PreviewButtonActionListener previewButtonActionListener) {
 		JPanel rowPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
 
-		// TODO: replace choose file here...
 		JPanel loadFilePanel = createFileButton();
-//		JPanel chooseFilePanel = new JPanel();
-
-//		chooseFilePanel.setPreferredSize(new Dimension(300, 300));
-//		chooseFilePanel.setLayout(new BorderLayout());
-//		chooseFilePanel.setBorder(null);
-//		chooseFilePanel.setBorder(BorderFactory.createLineBorder(Color.black, 1));
 
 		JPanel originalImage = new JPanel();
 
@@ -316,8 +292,6 @@ public class MyGUI {
 		/** Parametres frame */
 		JPanel parametersPanel = new JPanel(null);
 		parametersPanel.setPreferredSize(new Dimension(290, 275));
-//		parametersPanel.setBorder(BorderFactory.createLineBorder(Color.red, 1));
-//		parametersPanel.setBorder(BorderFactory.createEtchedBorder(Color.GRAY, Color.DARK_GRAY)); // Créer une bordure en relief
 		parametersPanel.setBorder(BorderFactory.createLoweredBevelBorder());
 
 		Font font = new Font(Font.MONOSPACED, Font.PLAIN, 14);
@@ -376,7 +350,7 @@ public class MyGUI {
 		parametersPanel.add(labelMode1);
 		parametersPanel.add(comboBox);
 
-		JButton previewButton = new JButton("Preview"); // TODO
+		JButton previewButton = new JButton("Preview"); 
 		previewButton.setFont(font);
 		previewButton.setBounds(85, 200, 125, 30); // setPreferredSize(new Dimension(200, 30));
 		previewButton.addActionListener(previewButtonActionListener);
@@ -442,37 +416,29 @@ public class MyGUI {
 	 * @return JPanel with this button
 	 */
 	protected static JPanel createFileButton() {
-		JPanel panel = new JPanel(null); // new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-		panel.setPreferredSize(new Dimension(300, 275)); // setPreferredSize(new Dimension(frame.getWidth() - 200, 30));
+		JPanel panel = new JPanel(null);
+		panel.setPreferredSize(new Dimension(300, 275));
 
 		JPanel buttonPanel = new JPanel(null);
-		buttonPanel.setPreferredSize(new Dimension(300, 275)); // setPreferredSize(new Dimension((int) (0.2 *
-																// panel.getPreferredSize().getWidth()),
-//				(int) panel.getPreferredSize().getHeight()));
-//		buttonPanel.setLayout(new BorderLayout());
+		buttonPanel.setPreferredSize(new Dimension(300, 275));
 
 		Font font = new Font(Font.MONOSPACED, Font.PLAIN, 14);
 
 		chooseFileButton = new JButton("Select file...");
 		chooseFileButton.setFont(font);
-		chooseFileButton.setBounds(50, 100, 200, 30); // setPreferredSize(new Dimension(400, 30));
+		chooseFileButton.setBounds(50, 100, 200, 30);
 
-//		buttonPanel.add(chooseFileButton); //add(chooseFileButton, BorderLayout.CENTER);
 		panel.add(chooseFileButton);
 
 		pathLabel = new JLabel("No file selected...");
 		pathLabel.setFont(font);
 		pathLabel.setBounds(50, 150, 175, 30);
-//		pathLabel.setPreferredSize(
-//				new Dimension((int) (0.5 * panel.getPreferredSize().getWidth()), pathLabel.getPreferredSize().height));
-//		pathLabel.setHorizontalAlignment(JLabel.LEFT);
 		panel.add(pathLabel);
 
 		JPanel labelPanel = new JPanel();
 		labelPanel.setPreferredSize(new Dimension((int) (0.5 * panel.getPreferredSize().getWidth()),
 				(int) panel.getPreferredSize().getHeight()));
 		labelPanel.setLayout(new BorderLayout());
-//		labelPanel.add(pathLabel); //add(pathLabel, BorderLayout.CENTER);
 
 		panel.add(buttonPanel);
 		panel.add(Box.createHorizontalStrut(50));
@@ -483,7 +449,7 @@ public class MyGUI {
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * FIXME a completer
+	 * Function
 	 * 
 	 * @param images
 	 * @return
@@ -526,21 +492,19 @@ public class MyGUI {
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * Method that displays the preview of the Original Stack FIXME??
+	 * Method that displays the preview screens.
 	 * 
 	 * @param imp Images Stack
 	 * @return
 	 */
 	protected static JPanel getPreviewWindow(ImagePlus imp) {
 		if (imp != null) {
-			int numFrames = imp.getStackSize();
 
 			ImagePlusPanel panel = new ImagePlusPanel(imp);
 			panel.setPreferredSize(new Dimension(400, 400));
 
 			JPanel placeholder = new JPanel(null);
 			placeholder.setPreferredSize(new Dimension(300, 275));
-//			placeholder.setBorder(BorderFactory.createEtchedBorder(EtchedBorder.LOWERED));
 
 			JSlider slider = new JSlider(1, imp.getStackSize(), 1);
 			sliders.add(slider);
@@ -574,7 +538,6 @@ public class MyGUI {
 			row1.add(panel, BorderLayout.CENTER);
 
 			JPanel row2 = new JPanel();
-			// row2.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 			row2.setPreferredSize(new Dimension((int) placeholder.getPreferredSize().getWidth(),
 					(int) (0.15 * placeholder.getPreferredSize().getHeight())));
 			row2.setLayout(new BorderLayout());
@@ -583,9 +546,6 @@ public class MyGUI {
 			row2.add(slider, BorderLayout.SOUTH);
 
 			placeholder.setLayout(new BoxLayout(placeholder, BoxLayout.PAGE_AXIS));
-//	        previewPanel.add(panel, BorderLayout.CENTER);
-//	        previewPanel.add(slider, BorderLayout.SOUTH);
-//	        previewPanel.add(sliceInfoLabel, BorderLayout.LINE_END);
 			placeholder.add(row1);
 			placeholder.add(row2);
 
@@ -671,69 +631,6 @@ public class MyGUI {
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/**
-	 * Class for the preview display.
-	 */
-	private static class StackCanvas extends Canvas {
-		private static final long serialVersionUID = 1L;
-
-		private final ImagePlus imp;
-		private final int imageWidth;
-		private final int imageHeight;
-
-		/*-----------------------------------------------------------------------------------------------------------------------*/
-		/**
-		 * Constructor of this class.
-		 * 
-		 * @param imp Stack of Images opened by ImageJ
-		 */
-		public StackCanvas(ImagePlus imp) {
-			this.imp = imp;
-			this.imageWidth = imp.getWidth();
-			this.imageHeight = imp.getHeight();
-//            setPreferredSize(new Dimension(imageWidth, imageHeight));
-		}
-
-		/*-----------------------------------------------------------------------------------------------------------------------*/
-		/**
-		 * Method that display the preview.
-		 */
-		@Override
-		public void paint(Graphics g) {
-			// Create off-screen buffer
-			Image offscreen = createImage(getWidth(), getHeight() + 30);
-			Graphics buffer = offscreen.getGraphics();
-
-			// Calculate the scale factor for the image
-			double scale = Math.min((double) getWidth() / imp.getWidth(), (double) getHeight() / imp.getHeight());
-
-			// Get the current slice and the corresponding image processor
-			int slice = imp.getCurrentSlice();
-			FileInfo fi = imp.getFileInfo();
-			BufferedImage img = imp.getStack().getProcessor(slice).getBufferedImage();
-
-			int scaledWidth = (int) (imp.getWidth() * scale);
-			int scaledHeight = (int) (imp.getHeight() * scale);
-
-			// Calculate the offset needed to center the image on the canvas
-			int offsetX = (getWidth() - scaledWidth) / 2;
-			int offsetY = (getHeight() - scaledHeight) / 2;
-
-			// Draw the image on the off-screen buffer
-			buffer.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight, null);
-
-			// TODO:replace this sliceText
-
-			// Draw the slice number and file name in the bottom-left corner
-			String sliceText = "Slice: " + slice + "/" + imp.getStackSize();
-			buffer.drawString(sliceText, 10, getHeight() + 30);
-
-			// Swap the buffers
-			g.drawImage(offscreen, 0, 0, getWidth(), getHeight(), null);
-		}
-	}
-
-	/*-----------------------------------------------------------------------------------------------------------------------*/
-	/**
 	 * Methods that updates the progress bar of the GreGoDec algorithm.
 	 * 
 	 * @param value
@@ -762,7 +659,6 @@ public class MyGUI {
 		public PreviewButtonActionListener(JPanel previewPanel, JPanel backgroundImagePanel) {
 			this.backgroundImagePanel = backgroundImagePanel;
 			this.previewPanel = previewPanel;
-//            this.processor = new ImageProcess();
 		}
 
 		/*-----------------------------------------------------------------------------------------------------------------------*/
@@ -819,6 +715,12 @@ public class MyGUI {
 	}
 
 	/*-----------------------------------------------------------------------------------------------------------------------*/
+	/**
+	 * Method that synchronize all the sliders in the interface.
+	 * 
+	 * @param sourceSlider slider that changed
+	 * @param sliders      all sliders in the interface
+	 */
 	private static void synchronizeSliders(JSlider sourceSlider, ArrayList<JSlider> sliders) {
 		int value = sourceSlider.getValue();
 		for (JSlider slider : sliders) {
@@ -831,22 +733,41 @@ public class MyGUI {
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/*-----------------------------------------------------------------------------------------------------------------------*/
 	/*-----------------------------------------------------------------------------------------------------------------------*/
+	/**
+	 * Class for the slices display.
+	 */
 	public static class ImagePlusPanel extends JPanel {
 		private static final long serialVersionUID = 1L;
 		private ImagePlus imp;
 		private Image img;
 
+		/*-----------------------------------------------------------------------------------------------------------------------*/
+		/**
+		 * ImagePlusPanel unique constructor.
+		 * 
+		 * @param imp images stack
+		 */
 		public ImagePlusPanel(ImagePlus imp) {
 			this.imp = imp;
 			this.img = imp.getImage();
 			setPreferredSize(new Dimension(imp.getWidth(), imp.getHeight()));
 		}
 
+		/*-----------------------------------------------------------------------------------------------------------------------*/
+		/**
+		 * Method that sets the images stack.
+		 * 
+		 * @param img images stack
+		 */
 		public void setImage(Image img) {
 			this.img = img;
 			repaint();
 		}
 
+		/*-----------------------------------------------------------------------------------------------------------------------*/
+		/**
+		 * Methods used to repaint slice.
+		 */
 		@Override
 		protected void paintComponent(Graphics g) {
 			super.paintComponent(g);
