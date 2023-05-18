@@ -26,15 +26,14 @@ cd  target
 The file is named `BackgroundRemoval-0.1.0-SNAPSHOT.jar` in the project folder and `GreGoDec-v0.1.jar` in the ImageJ website. After you get the .jar plugin, you just need to paste it into plugins Fiji.app folder.
 
 ## How to use it ?
-You should now see `Background Removal` in the Fiji `Plugins` bar:
-<img src="/samples/gifs/ImageJ_1.png" width="200" height="300">
+You should now see `Background Removal` in the Fiji `Plugins` bar:  
+<img src="/samples/gifs/ImageJ_1.png" width="350" height="450">
 After clicking, the GUI appears, you can select a file with the associated button and swipe to see all frames:   
-<img src="/samples/gifs/select_file.gif" width="400" height="200">
+<img src="/samples/gifs/select_file.gif" width="800" height="500">
 * The gray clock changes color depending on the estimated time needed to `Finalize` the calculation, **approximately** for default parameters:
-	* `$${\color{green}Green \space clock}$$`
-	* <font color="green">**Green clock**</font> < 5 seconds.
-	* <font color="orange">**Orange clock**</font> < 20 seconds.
-	* <font color="red">**Red clock**</font> >= 20 seconds.
+	*  🟢 **Green clock** < 5 seconds.
+	*  🟠 **Orange clock** < 20 seconds.
+	*  🔴 **Red clock** >= 20 seconds.
 
 
 Parameters like `Rank`, `Power`, `Error tolerance`, `Thresholding mode`, `Tau` and `k` (numbers of greatest singular values in the SVD calculation)  can be chosen to influence the output. You can choose `Preview` to see the result for the first 100 frames (or less if the stack has less frames):
