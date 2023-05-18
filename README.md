@@ -1,7 +1,7 @@
 
 
 # Background-Removal plugin for ImageJ and ImageJ2 (Fiji) 
-ImageJ is a fully java-based software for image processing in fields such as physics and biology. Our plugin aims to remove the background from a stack of images using the Low Rank + Sparse + Noise method from the article [Greedy Bilateral Sketch, Completion & Smoothing](https://proceedings.mlr.press/v31/zhou13b.html).
+ImageJ is a fully java-based software for image processing in fields such as physics and biology. Our plugin aims to remove the background from a stack of images using the Low Rank + Sparse + Noise method from the article [Greedy Bilateral Sketch, Completion & Smoothing](https://proceedings.mlr.press/v31/zhou13b.html) and inspired by the [Python code of the GreGoDec algorithm](https://github.com/FattaccioliLab/Codes/tree/master/LowRankSparseNoiseDecomposition-GoDec).
 * Low Rank => Background matrix
 * Sparse => Moving objects martrix
 * Noise => Disruption and errors matrix
@@ -12,7 +12,7 @@ ImageJ is a fully java-based software for image processing in fields such as phy
 ![Original](/samples/gifs/1-Original.gif) | ![Background](/samples/gifs/2-Background.gif) | ![Sparse](/samples/gifs/3-Sparse.gif) | ![Noise](/samples/gifs/4-Noise_1.gif)
 
 ## Installation tutorial
-###### Requirement:  [ImageJ (Fiji)](https://imagej.net/software/fiji/downloads)
+###### Requirement:  [ImageJ (Fiji)](https://imagej.net/software/fiji/downloads) / Apache Maven and Java
 You can get the `.jar` of this plugin from the plugins folder [here](https://sites.imagej.net/FattaccioliLab/). 
 Or from the project folder with Maven :
 ```bash
@@ -44,4 +44,9 @@ After clicking, the GUI appears, you can select a file with the associated butto
 Parameters like `Rank`, `Power`, `Error tolerance`, `Thresholding mode`, `Tau` and `k` (numbers of greatest singular values in the SVD calculation)  can be chosen to influence the output. You can choose `Preview` to see the result for the first 100 frames (or less if the stack has less frames):
 <p align="center">
   <img src="/samples/gifs/Preview.gif">
-</p>  
+</p>    
+If the output preview is satisfactory, you can choose to `Finalize` and save it from the default Fiji GUI:
+<p align="center">
+  <img src="/samples/gifs/Finalize.gif">
+</p>     
+
