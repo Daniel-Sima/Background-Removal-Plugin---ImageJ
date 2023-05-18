@@ -44,7 +44,8 @@ After clicking, the GUI appears, you can select a file with the associated butto
 Parameters like `Rank`, `Power`, `Error tolerance`, `Thresholding mode`, `Tau` and `k` (numbers of greatest singular values in the SVD calculation)  can be chosen to influence the output. You can choose `Preview` to see the result for the first 100 frames (or less if the stack has less frames):
 <p align="center">
   <img src="/samples/gifs/Preview.gif">
-</p>    
+</p>     
+
 If the output preview is satisfactory, you can choose to `Finalize` and save it from the default Fiji GUI:
 <p align="center">
   <img src="/samples/gifs/Finalize.gif">
