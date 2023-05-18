@@ -27,15 +27,15 @@ The file is named `BackgroundRemoval-0.1.0-SNAPSHOT.jar` in the project folder a
 
 ## How to use it ?
 You should now see `Background Removal` in the Fiji `Plugins` bar:
-![Start](/samples/gifs/ImageJ_1.png){:width="200px" height="200px"}   
+<img src="/samples/gifs/ImageJ_1.png" width="200" height="300">
 After clicking, the GUI appears, you can select a file with the associated button and swipe to see all frames:   
-![Interface](/samples/gifs/select_file.gif)    
+<img src="/samples/gifs/select_file.gif" width="400" height="200">
 * The gray clock changes color depending on the estimated time needed to `Finalize` the calculation, **approximately** for default parameters:
+	* `$${\color{green}Green \space clock}$$`
 	* <font color="green">**Green clock**</font> < 5 seconds.
-	* <font color="orange">**Green clock**</font> < 20 seconds.
+	* <font color="orange">**Orange clock**</font> < 20 seconds.
 	* <font color="red">**Red clock**</font> >= 20 seconds.
 
 
 Parameters like `Rank`, `Power`, `Error tolerance`, `Thresholding mode`, `Tau` and `k` (numbers of greatest singular values in the SVD calculation)  can be chosen to influence the output. You can choose `Preview` to see the result for the first 100 frames (or less if the stack has less frames):
-
 
