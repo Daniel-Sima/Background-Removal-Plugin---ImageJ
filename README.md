@@ -31,7 +31,7 @@ You should now see `Background Removal` in the Fiji `Plugins` bar:
 <p align="center">
 	<img src="/samples/gifs/ImageJ_1.png" width="350" height="450">  
 </p>  
-After clicking, the GUI appears, you can select a file with the associated button and swipe to see all frames:   
+After clicking, the GUI appears, you can select a file with the associated button (opens the same files as Fiji) and swipe to see all frames:   
 <p align="center">
   <img src="/samples/gifs/select_file.gif">
 </p>  
