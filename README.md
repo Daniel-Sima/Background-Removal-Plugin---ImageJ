@@ -1,4 +1,5 @@
 
+
 # Background-Removal plugin for ImageJ and ImageJ2 (Fiji) 
 ImageJ is a fully java-based software for image processing in fields such as physics and biology. Our plugin aims to remove the background from a stack of images using the Low Rank + Sparse + Noise method from the article [Greedy Bilateral Sketch, Completion & Smoothing](https://proceedings.mlr.press/v31/zhou13b.html).
 * Low Rank => Background matrix
@@ -41,4 +42,6 @@ After clicking, the GUI appears, you can select a file with the associated butto
 	*  🔴 **Red clock** >= 20 seconds.  
 
 Parameters like `Rank`, `Power`, `Error tolerance`, `Thresholding mode`, `Tau` and `k` (numbers of greatest singular values in the SVD calculation)  can be chosen to influence the output. You can choose `Preview` to see the result for the first 100 frames (or less if the stack has less frames):
-
+<p align="center">
+  <img src="/samples/gifs/Preview.gif">
+</p>  
