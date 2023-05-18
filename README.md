@@ -34,9 +34,11 @@ After clicking, the GUI appears, you can select a file with the associated butto
 <p align="center">
   <img src="/samples/gifs/select_file.gif">
 </p>  
+
 * The gray clock changes color depending on the estimated time needed to `Finalize` the calculation, **approximately** for default parameters:
 	*  🟢 **Green clock** < 5 seconds.
 	*  🟠 **Orange clock** < 20 seconds.
 	*  🔴 **Red clock** >= 20 seconds.  
+
 Parameters like `Rank`, `Power`, `Error tolerance`, `Thresholding mode`, `Tau` and `k` (numbers of greatest singular values in the SVD calculation)  can be chosen to influence the output. You can choose `Preview` to see the result for the first 100 frames (or less if the stack has less frames):
 
