@@ -81,6 +81,7 @@ public class ImageProcess {
 				R.set(x, z, RR.get(x, z));
 			}
 		}
+		
 		// Etape 2: Calculer le produit matriciel Y = A * R
 		DenseMatrix64F Y = new DenseMatrix64F(A.numRows, R.numCols);
 		CommonOps.mult(A, R, Y);

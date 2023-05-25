@@ -20,26 +20,31 @@
 	</organization>
 	<licenses>
 		<license>
-			<!-- FIXME: Your license here -->
 			<name>CC0</name>
 			<url>https://creativecommons.org/publicdomain/zero/1.0/</url>
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
 	<developers>
-		<!-- See https://imagej.net/Team -->
 		<developer>
-			<id>octocat</id> <!-- FIXME: Your GitHub handle here -->
-			<name>Noma Onomatopoeia</name> <!-- FIXME: Your name here          -->
-			<url>https://mycompany.com/people/noma-onomatopoeia</url> <!-- FIXME: Your website here       -->
+			<id>Daniel-Sima</id> 
+			<name>Daniel Sima</name> 
 			<roles>
-				<role>founder</role>
-				<role>lead</role>
 				<role>developer</role>
-				<role>debugger</role>
-				<role>reviewer</role>
-				<role>support</role>
-				<role>maintainer</role>
+			</roles>
+		</developer>
+		<developer>
+			<id>Skullriver</id> 
+			<name>Alina Novikova</name> 
+			<roles>
+				<role>developer</role>
+			</roles>
+		</developer>
+		<developer>
+			<id>lyeslai</id> 
+			<name>Lyes LAÏMOUCHE</name> 
+			<roles>
+				<role>developer</role>
 			</roles>
 		</developer>
 	</developers>
